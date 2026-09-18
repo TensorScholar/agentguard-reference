@@ -1,9 +1,0 @@
-{
-  "description": "Deterministic fixture: legitimate $85.00 refund authorization.",
-  "principal": "support-agent-v3",
-  "action": "refund.create",
-  "arguments": {"order_id": "ord_123", "amount_minor": 8500, "currency": "USD"},
-  "policy": {"allowed_actions": ["refund.create"], "max_amount_minor": 10000, "provenance": ["authenticated_user_input", "internal_database"]},
-  "mutated_arguments": {"order_id": "ord_123", "amount_minor": 85000, "currency": "USD"},
-  "expected_reason_code": "execution.arguments_digest_mismatch"
-}

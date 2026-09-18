@@ -1,47 +1,47 @@
 # Design decisions
 
-These decisions explain why AgentGuard looks like a runtime authorization kernel rather than a chatbot filter.
+These decisions describe the standalone 1.0.0 implementation, not additional architecture or validation results. The `agentguard_reference` namespace avoids collisions with other `agentguard` imports; an isolated `.venv` keeps dependencies separate without relying on another checkout.
 
-## Deterministic enforcement vs generative authorization
+## A small standalone package
 
-Language models are probabilistic. Authorization for refunds, exports, and production mutations cannot be “the model said it was OK.”
+`agentguard-reference` exposes `agentguard_reference` with `domain`, `engine`, `audit`, and `cli` responsibilities. Python >=3.11 and a standard-library runtime keep inspection independent of private packages. Development dependencies are separate. Provider integrations and experimental harnesses are not part of this package.
 
-AgentGuard keeps policy evaluation, receipt verification, digest comparison, and nonce reservation **out of the model loop**. The model may propose an `ActionIntent`. The kernel accepts or rejects it with stable reason codes.
+## Structured authority, not model judgment
 
-## Authorization and execution are separate
+An agent supplies a proposal. The current `Policy` is a refund demonstration, not identity authentication. Principal and provenance are asserted by a trusted caller. The `untrusted` flag is checked structurally; there is no prompt classification or inference of provenance from text. Natural-language approval is not execution authority, and policy compliance does not establish genuine human intent.
 
-Issuing a decision receipt is not the same as performing the action.
+## Snapshot all action fields
 
-- `authorize` records what was allowed.
-- `verify-execution` checks that a later intent still matches, without consuming the receipt.
-- Protected execution claims the nonce and is the only step that should precede side effects.
+`Action.create(principal=..., name=..., audience=..., arguments=...)` captures immutable JSON. Principal, name, audience, and all arguments are bound together so that an authorization cannot be transferred to a different structured action. Caller-owned nested mutations must not affect the snapshot.
 
-That split is why an $85 receipt cannot authorize an $850 call, and why a preflight success is not a license to retry forever.
+Bounded JSON and explicit validation avoid silent coercion. Floats are disallowed; refund values use integer minor units. Invalid values are rejected rather than normalized into new authority. Canonical ASCII arguments are capped at 65536 characters, nesting at depth 16 (root 0), containers at 1024 entries, and nonblank identity strings at 256 characters. Policy numeric limits are strict integers in `1..2**53`.
 
-## Credential / action binding
+## Bind current policy, not just a label
 
-A valid-looking credential is insufficient if it is wider than the decision. Grants are checked against the signed ceiling (`audience`, `scopes`, `tenant`, `TTL`). The showcase uses `broker-demo` to exhibit binding without pretending to be HashiCorp Vault or a cloud IAM service.
+The policy fingerprint covers the current configuration, including the allowlist, audience, amount ceiling, lifetime, and revision. Keeping the same revision string must not preserve authority after a material configuration change.
 
-## Replay-safe decision state
+## Separate authorization from dispatch
 
-Authorization material is treated as **single-use on the protected path** unless a future core contract explicitly says otherwise. Local SQLite reservation makes “retry the same receipt” a deterministic deny (`decision_receipt.replayed`) instead of a duplicate refund.
+`authorize` returns `Decision(allowed, reason, authorization)` conceptually; `execute` returns `ExecutionResult(status, reason, executor_called)`. These field summaries do not specify positional constructors. Issuing authorization does not call the executor, and possession of authorization is not a success result.
 
-This is not a claim about every possible queue, browser tab, or uninstrumented replica.
+The execution path rechecks bindings and lifetime, then consumes single-use authority before calling the callback. Consumption is never undone. This favors preventing repeated dispatch through the same store over transparent retries after uncertain outcomes.
 
-## Model output is not an authorization boundary
+## Explicitly local replay state
 
-Prompt filtering and guardrails reduce some unsafe text. They do not bind the bytes that later hit a payments API.
+The in-memory lock protects only the same store in the same process. It is intentionally not described as crash-safe, persistent, distributed, or exactly-once execution. A new process or independent store is outside this guarantee.
 
-AgentGuard’s boundary is the structured action: tool, resource, arguments, effects, principal, policy digest. If those bytes change after signing, execution verification fails.
+## Audit gates admission, not external truth
 
-## Complements, not replacements
+Authorization audit failure prevents usable authority. Dispatch audit failure prevents callback invocation. After dispatch, callback exception or outcome audit failure returns `unknown`, not a fabricated success or a claim that nothing happened.
 
-| Layer | What it owns | What it does not own |
-|---|---|---|
-| Guardrails / prompt filters | Natural-language risk reduction | Exact tool-argument integrity |
-| IAM / workload identity | Who the caller is | Whether this exact refund was authorized |
-| Policy engines | Permission design | Cryptographic binding + replay at execute time |
-| Secret vaults | Long-term secret storage | Decision-scoped late use of those secrets |
-| AgentGuard | Binds authorized intent to credential authority and admitted dispatch | Host isolation, model alignment, provider honesty |
+`succeeded` requires a returned callback and successful outcome audit. It does not certify a provider-side effect. There is no automatic retry, rollback, or reconciliation contract.
 
-Do not read these as a numbered industry-standard stack. They are adjacent jobs. AgentGuard is the runtime action-integrity job.
+## HMAC with explicit trust inputs
+
+HMAC uses the standard library but gives every key-holding verifier forging capability. It is shared-secret authentication, not a public signature or non-repudiation mechanism.
+
+The verifier takes an external key and a trusted expected head. Accepting a key embedded in an audit artifact would let that artifact choose its own authority. Accepting its head as the sole anchor would not establish completeness. The synthetic demo's public in-memory key is illustrative only.
+
+## Claims follow tests, not examples
+
+The [security-property map](security-properties.md) lists actual test paths and methods. A demo is not a test report, and neither documentation nor generated output alone establishes security. Publication excludes historical validation claims and production certification.

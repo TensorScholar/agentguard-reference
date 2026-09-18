@@ -1,9 +1,0 @@
-{
-  "description": "Deterministic fixture: single-use receipt presented twice.",
-  "principal": "support-agent-v3",
-  "action": "refund.create",
-  "arguments": {"order_id": "ord_9", "amount_minor": 1000, "currency": "USD"},
-  "expected_first": "execution.allowed",
-  "expected_second": "decision_receipt.replayed",
-  "expected_executor_calls": 1
-}

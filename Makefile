@@ -1,16 +1,22 @@
-.PHONY: verify tests experiments evidence examples
+.PHONY: verify tests lint typecheck demo release
 
-verify: tests experiments evidence
+PYTHON ?= python3
+export PYTHONDONTWRITEBYTECODE = 1
+export PYTHONPATH = src
 
 tests:
-	cd reference-kernel && python3 -m pytest tests/ -q
-	python3 -m pytest tests/ -q
+	$(PYTHON) -m pytest -q
 
-experiments:
-	python3 experiments/run_experiment.py
+lint:
+	$(PYTHON) -m ruff check --no-cache src tests examples scripts
 
-evidence:
-	python3 scripts/verify_evidence.py
+typecheck:
+	$(PYTHON) -m mypy --cache-dir=/dev/null src
 
-examples:
-	python3 examples/quickstart.py
+demo:
+	$(PYTHON) -m agentguard_reference demo
+
+verify: tests lint typecheck demo
+
+release: verify
+	$(PYTHON) scripts/build_release.py

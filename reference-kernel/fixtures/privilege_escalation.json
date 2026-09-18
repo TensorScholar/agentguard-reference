@@ -1,9 +1,0 @@
-{
-  "description": "Deterministic fixture: action/audience widening attempt.",
-  "principal": "support-agent-v3",
-  "legitimate": {"action": "refund.create", "audience": "payments.internal"},
-  "escalated_action": "wire.transfer",
-  "forged_audience": "treasury.internal",
-  "expected_policy_reason": "policy.unknown_action",
-  "expected_credential_reason": "credential.audience_mismatch"
-}

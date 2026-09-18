@@ -1,61 +1,41 @@
 # Threat model
 
-This document describes threats the **current AgentGuard reference repository can demonstrate**, and risks that remain out of scope. Claims are bounded to traffic and configuration that actually enter AgentGuard.
+This threat model describes the standalone 1.0.0 reference package. Controls below map to the current tests, not reported test results.
 
-## In scope: demonstrated on protected paths
+## Assets and boundary
 
-### Post-authorization argument mutation
+The protected assets are the integrity of a structured authorization, the single guarded callback dispatch it permits, and the authenticated audit sequence. Untrusted proposals enter through `Action.create`; enforcement occurs in `Guard.authorize` and `Guard.execute`.
 
-An $85 refund is authorized. Tool arguments are later changed to $850.
+The trusted caller supplies principal and provenance assertions, policy, key, clock, nonce factory, and executor. The current policy is a refund demonstration, not identity authentication. It rejects `untrusted` unless absent or boolean false; it does not infer provenance from text and performs no prompt classification. If an untrusted caller can freely assert a trusted principal or omit provenance, this package does not authenticate or correct that assertion.
 
-- Control: canonical `arguments_digest` on the decision receipt, rechecked at execution verification
-- Observable: `execution.arguments_digest_mismatch`
-- Demo: [`demos/refund-agent`](../demos/refund-agent)
+## In-scope attempts and controls
 
-### Decision-receipt replay
+| Attempt | Control | Boundary |
+|---|---|---|
+| Change principal, name, audience, or arguments after approval | Immutable JSON snapshot and authorization binding of every field | Only guarded execution is checked |
+| Change policy while retaining the revision label | Fingerprint of current policy configuration | Policy source remains trusted |
+| Request a disallowed action, wrong audience, or excessive refund | Explicit policy denial | Policy expresses only the supplied constraints |
+| Present expired or tampered authorization | Lifetime and HMAC validation before dispatch | Trusted key and clock required |
+| Replay authorization, including concurrent reuse | Atomic consume before callback; never release | Same store, same process only |
+| Use malformed, floating-point, oversized, or deeply nested inputs | Strict bounded input validation | Not a general host-level denial-of-service defense |
+| Proceed when authorization or dispatch auditing fails | Fail closed before callback | No claim of durable audit storage |
+| Treat callback exception or outcome audit failure as success | Return `unknown` after dispatch | No automatic retry or effect reconciliation |
+| Modify, reorder, or truncate audit records | Chain verification against external key and trusted expected head | Shared-secret holders can forge; an untrusted head is not an anchor |
+| Supply an embedded verification key | Require an external key file | Verifier must protect its independent trust inputs |
 
-A consumed authorization is presented again on the protected execution path.
+## Trusted assumptions
 
-- Control: durable nonce reservation in AgentGuard state
-- Observable: `decision_receipt.replayed`
-- Demo: [`demos/replay-prevention`](../demos/replay-prevention)
+- The Python process, runtime, host, and implementation have not been compromised.
+- Policy and principal labels are supplied by an appropriate trusted caller.
+- Non-demo HMAC keys remain secret and have suitable entropy; the verifier's key and expected head are authentic.
+- The clock and nonce factory satisfy their intended roles.
+- The caller routes protected operations through the guard and does not expose a parallel unguarded executor route.
+- The executor is responsible for interpreting the dispatched action; callback return is only a local observation.
 
-### MCP unmediated / parallel bypass configuration
+## Outside the boundary
 
-A client config includes a direct launch of the same downstream server that a proxy already mediates.
+No protection is claimed against compromised hosts, malicious key holders, direct provider calls, malicious executors, restart replay, cross-process replay, or independent in-memory stores. There are no provider adapters, external identity integrations, persistent coordination, or business-effect reconciliation.
 
-- Control: `mcp-posture --fail-on-bypass`
-- Observables: `mcp.direct_connection_bypasses_agentguard`, `mcp.parallel_direct_bypass`, non-zero exit
-- Demo: [`demos/mcp-security`](../demos/mcp-security)
+Prompt injection is not solved as a class. A malicious proposal that satisfies the configured policy can still be allowed; policy compliance is not proof that the proposal matches a person's intent.
 
-### Credential scope exceeding decision authority
-
-Core AgentGuard rejects a grant whose scopes exceed the signed ceiling (`credential.scope_exceeds_decision`). That path is exercised by `agentguard demo` in the core package. It is **not** a separate demonstration runner in this repository.
-
-## Trust boundary
-
-```text
-Untrusted:  agent, model, prompts, mutated arguments, extra MCP routes
-Enforced:   policy, receipt, grant ceiling, digest compare, nonce consume, posture scan
-Assumed:    OS, signing keys, adapter identity labels, downstream provider honesty
-```
-
-## Out of scope
-
-These are not solved by installing or running this reference repository:
-
-| Risk | Why it is out of scope |
-|---|---|
-| Fully compromised host OS | Kernel, memory, and process control sit below AgentGuard |
-| Stolen or malicious signing keys | Receipts are only as trustworthy as the key boundary |
-| Actions that never enter AgentGuard | Uninstrumented executors bypass the kernel entirely |
-| Hidden MCP/network routes not in the scanned file | `mcp-posture` audits supplied configuration, not the whole host |
-| Malicious model weights by themselves | The model is an untrusted proposer; enforcement is at execution |
-| Social engineering outside the protected path | Humans and out-of-band approvals are not this boundary |
-| Malicious external systems after verified dispatch | AgentGuard binds what it sends; it does not vouch for provider business truth |
-| Prompt injection as a complete class | Argument mutation after authorization is demonstrated; natural-language injection is not “solved” |
-| Production certification | `0.2.0rc3` is an engineering-validated release candidate |
-
-## Residual risk
-
-Even on a correctly integrated path, AgentGuard cannot prove that another process did not call the same provider directly. Deployment isolation, identity, secret managers, and network policy remain necessary complementary controls.
+See [limitations](limitations.md) and [the test map](security-properties.md). This reference is not a production certification.

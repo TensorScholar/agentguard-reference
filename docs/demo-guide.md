@@ -1,125 +1,57 @@
 # Demo guide
 
-Audience: security engineers, platform engineers, technical interviewers, CTOs evaluating a design partnership.
+The standalone 1.0.0 CLI requires Python >=3.11, without provider credentials or integrations.
 
-These demonstrations consume a local AgentGuard core install. The core repository is maintained separately; a random GitHub visitor cannot always run this core-dependent suite without that sibling checkout.
+## Install
 
-## Prerequisites
+From the package root, use an isolated environment:
 
-- macOS or Linux
-- Python 3.11+
-- Access to the AgentGuard core checkout used with these demonstrations (validated baseline: `0.2.0rc3`)
-- Sibling layout, or `AGENTGUARD` pointing at a working CLI
-
-```text
-<parent>/
-  agentguard/              # core
-  agentguard-reference/    # this repo (or any folder name)
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install .
+python -m agentguard_reference demo
 ```
 
-Do not assume `pip install agentguard` from PyPI is this project.
+The distribution and CLI are named `agentguard-reference`; the distinct `agentguard_reference` import namespace avoids collisions with other `agentguard` packages.
 
-## Setup
+## Read the output
 
-If the sibling core already has `.venv/bin/agentguard`, the demo scripts discover it.
+The demo fixes time at 1000 and uses a fixed synthetic nonce, a public illustrative in-memory HMAC key, and a callback that appends arguments to a list. Repeated runs produce the same JSON. It does not issue a real refund or contact a provider.
 
-Otherwise, from this repository:
-
-```bash
-./scripts/bootstrap.sh --install
-export AGENTGUARD="$PWD/.venv/bin/agentguard"
-```
-
-`bootstrap.sh --install` creates a **repository-local** virtualenv and installs the sibling core in editable mode. It does not modify core source files.
-
-Check:
-
-```bash
-./scripts/bootstrap.sh
-```
-
-## One-command run
-
-```bash
-./run_demo.sh
-```
-
-Expected summary when all three real demos succeed:
-
-```text
-AgentGuard Reference Demos
-
-Refund mutation         PASS
-Replay prevention       PASS
-MCP bypass detection    PASS
-
-Overall                 PASS
-```
-
-`PASS` is printed only if that demo process exited 0 after checking AgentGuard’s actual result.
-
-Preserve generated workspaces:
-
-```bash
-./run_demo.sh --keep-workspace
-```
-
-Workspaces are created under `.showcase-workspaces/` (gitignored). On macOS, `/tmp` cannot be used because AgentGuard refuses symlink path components such as `/var`.
-
-## Expected outcomes
-
-### Refund mutation — `demos/refund-agent`
-
-| Step | Expected |
+| Field | Interpretation |
 |---|---|
-| `authorize` $85 | `ALLOW` |
-| `verify-execution` $85 | exit 0, “Execution authority verified; nonce not consumed” |
-| `verify-execution` $850 | non-zero exit, `execution.arguments_digest_mismatch` |
+| `schema` | `agentguard-reference-demo-v1` |
+| `key_warning` | Labels the public illustrative key; does not export a verification secret |
+| `decision` | Authorization decision and synthetic authorization |
+| `records`, `head` | Audit records and chain endpoint |
+| `results` | First dispatch and replay-denial results |
+| `executor_calls` | Callback invocation count |
+| `verified` | Internal consistency under the public demo key |
 
-This is execution-authority verification, not a live refund.
+The demo returns status 0 only when verification is true and the callback count is one; otherwise it returns 1. Its first result is `succeeded`/`executor.returned`; replay is `denied`/`authorization.replayed`. This describes the code and assertions in `tests/unit/test_cli.py`, not an independent release attestation.
 
-### Replay prevention — `demos/replay-prevention`
+`denied` means no callback dispatch. `succeeded` requires callback return and successful outcome auditing. `unknown` means dispatch occurred but the guarded outcome could not be confirmed; it must not trigger reuse of consumed authorization.
 
-| Step | Expected |
-|---|---|
-| First `execute_protected` | `status: success` |
-| Second use of the same receipt | `decision_receipt.replayed` |
-| Fake executor calls | `1` |
+## Verify an audit file
 
-### MCP posture — `demos/mcp-security`
+In the activated environment, for separately provisioned inputs:
 
-| Config | Expected |
-|---|---|
-| `protected.json` | exit 0, `mcp.agentguard_proxy_enforced` |
-| `bypass.json` | exit 1, `mcp.direct_connection_bypasses_agentguard`, `mcp.parallel_direct_bypass` |
-
-## Run demos separately
-
-```bash
-./demos/refund-agent/run.sh
-./demos/replay-prevention/run.sh
-./demos/mcp-security/run.sh
+```sh
+python -m agentguard_reference verify audit.json --key-file verification.key --expected-head HEX
 ```
 
-## Inspecting generated state
+The paths are examples, not supplied fixtures. The audit input is UTF-8 JSON: either a record array or an object whose `records` value is that array. The key file supplies raw bytes, not decoded hex or base64; it needs at least 32 bytes. The file-size checks accept audit files up to 10485760 bytes (10 MiB) and key files up to 4096 bytes, inclusive, based on `stat()` before reads. These checks are not race-free streaming limits.
 
-```bash
-./demos/refund-agent/run.sh --keep-workspace
-```
+Replace `HEX` with a trusted, independently obtained 64-character lowercase hexadecimal head. The CLI ignores embedded keys and document head metadata as authority; only the external key and `--expected-head` control verification. A key-holding verifier can forge HMAC records, and a head copied only from untrusted input does not establish completeness.
 
-Then inspect the printed workspace path for `receipt.json`, `grant.json`, and `audit.sqlite`. Do not commit those files. They include signing keys.
+## Failure behavior and exit status
 
-Core also ships `agentguard demo` and `evidence-verify` for a bundled meeting scenario; that is optional and not required for this repository’s runner.
+- Successful verification prints `{"verified": true}` and exits 0.
+- A wrong key/head, tampered record, or missing record field prints `{"verified": false}` and exits 1.
+- Malformed JSON, missing/non-array `records`, unreadable files, or excessive reported size prints `verification failed: invalid or unreadable input` to stderr and exits 1.
+- Missing `--key-file` or `--expected-head` is an argparse error with exit status 2, before file reads.
 
-## Troubleshooting
+The policy is a refund demonstration, not identity authentication. Principal and provenance are asserted by the trusted caller; there is no prompt classification. Action arguments are canonical ASCII JSON limited to 65536 characters, depth 16 (root 0), and 1024 entries per container; nonblank identities are at most 256 characters. Policy limits are strict integers in `1..2**53`; authorization is valid only for `issued_at <= now < expires_at`, excluding exact expiry.
 
-| Symptom | What to check |
-|---|---|
-| `AgentGuard CLI was not found` | Sibling checkout, `AGENTGUARD`, or `./scripts/bootstrap.sh --install` |
-| `unsafe symlink component: /var` | Workspace is not under `/tmp`; current scripts use `.showcase-workspaces/` |
-| Mutated refund unexpectedly `ALLOW` | Policy/request files changed; demo must fail closed |
-| Replay reason is not `decision_receipt.replayed` | Preflight-only `verify-execution` does not consume; use the replay demo as written |
-| MCP bypass exits 0 | Confirm `--fail-on-bypass` and that `bypass.json` still contains the direct route |
-| Wrong package | A different PyPI project named similarly will not produce these reason codes |
-
-These demos were validated on macOS with AgentGuard `0.2.0rc3`. Cross-platform compatibility is not claimed beyond that.
+See [reproducibility](reproducibility.md) for checks and [security properties](security-properties.md) for actual test paths and methods.

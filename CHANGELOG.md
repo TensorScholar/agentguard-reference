@@ -1,22 +1,17 @@
-# Changelog — AgentGuard reference repository
+# Changelog
 
-## v4 (2026-09-07) — standalone public repository
+## 1.0.0
 
-- Adversarial scenario framework: 6 scenarios (argument mutation, replay,
-  credential mismatch, stale authorization, privilege escalation,
-  prompt-injection boundary) with deterministic fixtures and
-  machine-readable results.
-- `prompt_injection_solved: false` stated in machine-readable output.
-  Prompt injection is not claimed solved.
-- Thread-safe in-memory replay store (+ concurrency test). Crash safety and
-  multi-process use remain explicitly out of scope.
-- Docs: attack taxonomy, rejected designs, operational lessons, tradeoffs.
-- Standalone repo layout: `make verify`, local verification harness, LICENSE, examples.
+This entry describes the standalone implementation and release workflow, not test results or a packaging attestation.
 
-Evidence: reference-kernel results are L2 (publicly reproducible).
-Private-core claims remain L1. No L3 claimed. No production users claimed.
+- Distribution: `agentguard-reference`; import package: `agentguard_reference`.
+- Python >=3.11, standard-library runtime, no private dependencies.
+- Source boundaries: `domain`, `engine`, `audit`, and `cli` under `src/agentguard_reference`.
+- Immutable bounded JSON actions, explicit policy configuration, HMAC-bound authorization, and same-process single-use execution.
+- Explicit `denied`, `succeeded`, and `unknown` execution outcomes with fail-closed authorization and dispatch auditing.
+- Synthetic JSON demo and audit verification using an external key and trusted expected head.
+- Unit, CLI, security, and adversarial tests with actual path/method mapping; `make verify` runs pytest, Ruff, mypy, and the demo.
+- `make release` runs verification, then `scripts/build_release.py`; its output contract is `release/agentguard-reference-final.zip`, `release/agentguard-reference-final.zip.sha256`, and `release/manifest.sha256`, with `MANIFEST.sha256` inside the ZIP. See [reproducibility](docs/reproducibility.md) for prerequisites and validation.
+- Documentation replaces legacy harness instructions with the standalone package contract; provider integrations and unfinished experiments are excluded from release scope.
 
-## v3 — reference kernel + experiments
-
-- Control-plane kernel (digest, receipt, policy, credential, executor
-  boundary), 4 attack demos, experiment runner, evidence ledger.
+No historical validation results, generated evidence claims, or production certification are carried forward. Test outcomes and release artifacts must be established by an actual run.

@@ -1,8 +1,0 @@
-{
-  "description": "Deterministic fixture: receipt presented after TTL expiry.",
-  "principal": "support-agent-v3",
-  "action": "refund.create",
-  "arguments": {"order_id": "ord_stale_1", "amount_minor": 2000, "currency": "USD"},
-  "receipt": {"ttl_seconds": 60, "issued_seconds_ago": 3600},
-  "expected_reason_code": "execution.receipt_expired"
-}

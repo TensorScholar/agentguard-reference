@@ -21,3 +21,5 @@ dist/
 .DS_Store
 tmp/
 .validation/
+release/
+.benchmarks/
