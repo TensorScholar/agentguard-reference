@@ -6,10 +6,12 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import replace
-from typing import Any
+from typing import Any, Literal
 
 from ..audit import ZERO_HEAD, AuditLog, is_digest, valid_key
 from ..domain import Action, Authorization, Decision, ExecutionResult, Policy, canonical, identity
+
+ClaimResult = Literal["claimed", "replayed", "rejected"]
 
 
 class ReplayStore:
@@ -18,11 +20,18 @@ class ReplayStore:
         self._lock = threading.Lock()
 
     def consume(self, authorization_id: str) -> bool:
+        return self.claim(authorization_id, lambda: True) == "claimed"
+
+    def claim(self, authorization_id: str, admit: Callable[[], bool]) -> ClaimResult:
+        if type(authorization_id) is not str:
+            return "rejected"
         with self._lock:
             if authorization_id in self._consumed:
-                return False
+                return "replayed"
+            if not admit():
+                return "rejected"
             self._consumed.add(authorization_id)
-            return True
+            return "claimed"
 
 
 class Guard:
@@ -30,7 +39,7 @@ class Guard:
                  audit: AuditLog | None = None, clock: Callable[[], float] = time.time,
                  nonce_factory: Callable[[], str] = lambda: uuid.uuid4().hex) -> None:
         valid_key(key)
-        if not isinstance(policy, Policy) or not callable(clock) or not callable(nonce_factory):
+        if type(policy) is not Policy or not callable(clock) or not callable(nonce_factory):
             raise ValueError("invalid guard configuration")
         self._policy = policy
         self._key = key
@@ -114,20 +123,26 @@ class Guard:
             reason = self._policy.evaluate(action)
             if reason != "policy.allowed":
                 return deny(reason)
-            now = self._now()
-            if (type(authorization.issued_at) not in (float, int)
-                    or type(authorization.expires_at) not in (float, int)
-                    or not math.isfinite(authorization.issued_at)
-                    or not math.isfinite(authorization.expires_at)
-                    or not authorization.issued_at <= now < authorization.expires_at
-                    or authorization.expires_at - authorization.issued_at
-                    > self._policy.ttl_seconds):
-                return deny("authorization.invalid_time")
             if not callable(executor):
                 return deny("execution.invalid_executor")
             arguments = action.arguments
-            if not self._replay.consume(identifier):
+
+            def still_valid() -> bool:
+                now = self._now()
+                issued = authorization.issued_at
+                expires = authorization.expires_at
+                return (
+                    type(issued) in (float, int) and type(expires) in (float, int)
+                    and math.isfinite(issued) and math.isfinite(expires)
+                    and issued <= now < expires
+                    and expires - issued <= self._policy.ttl_seconds
+                )
+
+            outcome = self._replay.claim(identifier, still_valid)
+            if outcome == "replayed":
                 return deny("authorization.replayed")
+            if outcome != "claimed":
+                return deny("authorization.invalid_time")
         except Exception:
             return deny("execution.invalid_input")
         if not self._event("execution.admitted", identifier, action_digest, "execution.admitted"):
@@ -137,6 +152,9 @@ class Guard:
         except Exception:
             self._event("execution.unknown", identifier, action_digest, "executor.raised")
             return ExecutionResult("unknown", "executor.raised", True, identifier)
+        except BaseException:
+            self._event("execution.unknown", identifier, action_digest, "executor.interrupted")
+            raise
         if not self._event("execution.succeeded", identifier, action_digest, "executor.returned"):
             return ExecutionResult("unknown", "audit.unavailable", True, identifier)
         return ExecutionResult("succeeded", "executor.returned", True, identifier)

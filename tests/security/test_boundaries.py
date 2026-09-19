@@ -242,3 +242,40 @@ class BoundaryTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     Action(*values)
         self.callback.assert_not_called()
+
+    def test_admission_samples_clock_inside_claim(self) -> None:
+        events: list[str] = []
+        clock_during_claim: list[bool] = []
+
+        class TracingStore(ReplayStore):
+            def claim(self, authorization_id: str, admit: Any) -> Any:
+                events.append("enter")
+
+                def wrapped() -> bool:
+                    clock_during_claim.append("enter" in events and "exit" not in events)
+                    return bool(admit())
+
+                result = ReplayStore.claim(self, authorization_id, wrapped)
+                events.append("exit")
+                return result
+
+        store = TracingStore()
+        guard = Guard(policy=Policy(), key=KEY, replay_store=store, clock=lambda: 1000.0)
+        authorization = guard.authorize(self.action).authorization
+        events.clear()
+        clock_during_claim.clear()
+        result = guard.execute(self.action, authorization, self.callback)
+        self.assertEqual(result.status, "succeeded")
+        self.assertEqual(events, ["enter", "exit"])
+        self.assertEqual(clock_during_claim, [True])
+        self.callback.assert_called_once_with(self.action.arguments)
+
+    def test_rejected_claim_does_not_consume(self) -> None:
+        store = ReplayStore()
+        guard = Guard(policy=Policy(), key=KEY, replay_store=store, clock=lambda: 1000.0)
+        authorization = guard.authorize(self.action).authorization
+        assert authorization is not None
+        self.assertEqual(store.claim(authorization.id, lambda: False), "rejected")
+        result = guard.execute(self.action, authorization, self.callback)
+        self.assertEqual(result.status, "succeeded")
+        self.callback.assert_called_once_with(self.action.arguments)

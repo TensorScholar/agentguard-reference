@@ -54,8 +54,9 @@ class AuditLog:
                       "event": event, "authorization_id": authorization_id,
                       "action_digest": action_digest, "reason": reason}
             record["mac"] = record_mac(record, self._key)
-            self._head = record_head(record)
+            head = record_head(record)
             self._records.append(record)
+            self._head = head
 
     def snapshot(self) -> list[dict[str, Any]]:
         with self._lock:

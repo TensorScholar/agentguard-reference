@@ -146,3 +146,14 @@ class ScenarioTests(unittest.TestCase):
             self.guard.execute(changed, authorization, self.callback),
             "authorization.action_mismatch",
         )
+
+    def test_synthetic_principal_mismatch_is_action_mismatch(self) -> None:
+        authorization = self.guard.authorize(self.action).authorization
+        changed = self.make_action(principal="synthetic-other-principal")
+        self.assert_denied(
+            self.guard.execute(changed, authorization, self.callback),
+            "authorization.action_mismatch",
+        )
+        decision = self.guard.authorize(changed)
+        self.assertTrue(decision.allowed)
+        self.assertNotEqual(changed.digest, self.action.digest)

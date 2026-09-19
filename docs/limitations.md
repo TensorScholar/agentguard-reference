@@ -1,14 +1,14 @@
 # Limitations
 
-These limits apply to the standalone `agentguard-reference` 1.0.0 implementation. The package is a reference for a guarded callback boundary, not a production certification or a complete deployment security system.
+These limits apply to the standalone `agentguard-reference` 1.0.1 implementation. The package is a reference for a guarded callback boundary, not a production certification or a complete deployment security system.
 
 ## Local state only
 
-Single-use consumption is protected by an in-memory lock for the same store in the same process. There is no persistence, crash recovery, cross-process coordination, or protection across independent stores. Authorization consumed before a callback is never released, even after a callback or audit failure. This is not exactly-once business execution or a retry protocol.
+Single-use consumption is protected by an in-memory lock for the same store in the same process. The clock used at reservation is sampled while that lock is held. There is no persistence, crash recovery, cross-process coordination, or protection across independent stores. Authorization consumed before a callback is never released, even after a callback, interruption, or audit failure. Expired tickets are not consumed. This is not exactly-once business execution or a retry protocol.
 
 ## Callback outcome is not business truth
 
-`succeeded` requires the callback to return and outcome audit recording to succeed. It does not prove an external service completed an operation. A callback may perform an effect and then raise; outcome audit may fail after a returned callback. Both must be treated as `unknown`, not as evidence that no effect occurred. No provider reconciliation, rollback, or automatic retry is included.
+`succeeded` requires the callback to return and outcome audit recording to succeed. It does not prove an external service completed an operation. A callback may perform an effect and then raise; a `BaseException` may interrupt after dispatch; outcome audit may fail after a returned callback. These must be treated as `unknown` (or as an interrupted dispatch with an `execution.unknown` record), not as evidence that no effect occurred. No provider reconciliation, rollback, or automatic retry is included.
 
 ## HMAC and audit trust
 
@@ -24,11 +24,11 @@ Host integrity, Python runtime integrity, key confidentiality, suitable nonce ge
 
 The current policy is a refund demonstration covering the action allowlist, audience, integer amount ceiling, and caller-asserted `untrusted` flag; lifetime and configuration binding are rechecked at execution. Principal and provenance are asserted by the trusted caller, not authenticated by this package. There is no prompt classification. A malicious but policy-compliant proposal may be allowed; prompt injection is not solved as a class.
 
-Actions use immutable bounded JSON. Floats, unsupported objects, and values beyond validation limits are rejected. Integer minor units avoid floating-point currency ambiguity but do not establish currency conversion, accounting correctness, or arbitrary resource safety. Bounds constrain accepted input, not every possible denial-of-service risk.
+Actions use immutable bounded JSON. Identity strings reject surrounding whitespace and ASCII control characters. Floats, unsupported objects, and values beyond validation limits are rejected. Integer minor units avoid floating-point currency ambiguity but do not establish currency conversion, accounting correctness, or arbitrary resource safety. Bounds constrain accepted input, not every possible denial-of-service risk.
 
 ## No integrations or operational guarantees
 
-No provider adapters, network mediation, secret manager, durable replay service, distributed coordinator, or external business-effect verification is included. No performance, scalability, availability, platform-coverage, or production-readiness claims are made here. Unfinished experiments and legacy harnesses are outside the release scope.
+No provider adapters, network mediation, secret manager, credential issuance, durable replay service, distributed coordinator, or external business-effect verification is included. No performance, scalability, availability, platform-coverage, or production-readiness claims are made here. Unfinished experiments and legacy harnesses are outside the release scope.
 
 ## Validation status
 

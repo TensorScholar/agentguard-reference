@@ -1,6 +1,6 @@
 # Demo guide
 
-The standalone 1.0.0 CLI requires Python >=3.11, without provider credentials or integrations.
+The standalone 1.0.1 CLI requires Python >=3.11, without provider credentials or integrations.
 
 ## Install
 
@@ -22,6 +22,7 @@ The demo fixes time at 1000 and uses a fixed synthetic nonce, a public illustrat
 | Field | Interpretation |
 |---|---|
 | `schema` | `agentguard-reference-demo-v1` |
+| `package_version` | Import-package version string |
 | `key_warning` | Labels the public illustrative key; does not export a verification secret |
 | `decision` | Authorization decision and synthetic authorization |
 | `records`, `head` | Audit records and chain endpoint |
@@ -52,6 +53,6 @@ Replace `HEX` with a trusted, independently obtained 64-character lowercase hexa
 - Malformed JSON, missing/non-array `records`, unreadable files, or excessive reported size prints `verification failed: invalid or unreadable input` to stderr and exits 1.
 - Missing `--key-file` or `--expected-head` is an argparse error with exit status 2, before file reads.
 
-The policy is a refund demonstration, not identity authentication. Principal and provenance are asserted by the trusted caller; there is no prompt classification. Action arguments are canonical ASCII JSON limited to 65536 characters, depth 16 (root 0), and 1024 entries per container; nonblank identities are at most 256 characters. Policy limits are strict integers in `1..2**53`; authorization is valid only for `issued_at <= now < expires_at`, excluding exact expiry.
+The policy is a refund demonstration, not identity authentication. Principal and provenance are asserted by the trusted caller; there is no prompt classification. Action arguments are canonical ASCII JSON limited to 65536 characters, depth 16 (root 0), and 1024 entries per container; nonempty identities are at most 256 characters and reject surrounding whitespace and ASCII control characters. Policy limits are strict integers in `1..2**53`; authorization is valid only for `issued_at <= now < expires_at`, excluding exact expiry. Exact expiry does not consume the ticket.
 
 See [reproducibility](reproducibility.md) for checks and [security properties](security-properties.md) for actual test paths and methods.

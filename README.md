@@ -1,6 +1,6 @@
 # AgentGuard Reference
 
-`agentguard-reference` 1.0.0 is a standalone Python reference package for binding an authorized structured action to a single guarded callback dispatch. The import package is `agentguard_reference`; runtime requirements are Python >=3.11 and the standard library only. No private dependencies or provider integrations are included.
+`agentguard-reference` 1.0.1 is a standalone Python reference package for binding an authorized structured action to a single guarded callback dispatch. The import package is `agentguard_reference`; runtime requirements are Python >=3.11 and the standard library only. No private dependencies or provider integrations are included.
 
 The `agentguard_reference` namespace avoids import collisions with other `agentguard` packages and keeps the reference independent. These documents describe the implementation, not a release attestation or production certification.
 
@@ -46,9 +46,9 @@ This is a signature sketch, not a complete executable example. `key` must be byt
 - `execute` returns an `ExecutionResult` with `status`, `reason`, and `executor_called`. Status is `denied`, `succeeded`, or `unknown`.
 - `succeeded` requires the callback to have returned and outcome audit recording to have succeeded; it does not prove an external business effect.
 - Authorization and dispatch audit failures fail closed. Outcome audit failure after dispatch produces `unknown`.
-- Single-use authorization is consumed before the callback and never released, including after failure. Locking protects only the same in-memory store in the same process.
+- Single-use authorization is claimed under the in-memory store lock, with the clock sampled inside that claim. Failure of the lifetime predicate does not consume the ticket. Locking protects only the same in-memory store in the same process.
 
-The immutable JSON action snapshot binds the principal, action name, audience, and every argument. Canonical ASCII arguments are limited to 65536 characters, nesting depth 16 (root depth 0), and 1024 entries per container; identity strings are nonblank and at most 256 characters. Floats are disallowed; refund amounts use integer minor units. Policy limits are strict positive integers at most `2**53`. The current policy is a refund demonstration, not identity authentication: principal and provenance are asserted by a trusted caller, and there is no prompt classification. Authorization is valid only while `issued_at <= now < expires_at`; the exact expiry boundary denies dispatch. See [architecture](docs/architecture.md).
+The immutable JSON action snapshot binds the principal, action name, audience, and every argument. Canonical ASCII arguments are limited to 65536 characters, nesting depth 16 (root depth 0), and 1024 entries per container; identity strings are nonempty, at most 256 characters, and reject surrounding whitespace and ASCII control characters. Floats are disallowed; refund amounts use integer minor units. Policy limits are strict positive integers at most `2**53`. The current policy is a refund demonstration, not identity authentication: principal and provenance are asserted by a trusted caller, and there is no prompt classification. Authorization is valid only while `issued_at <= now < expires_at`; the exact expiry boundary denies dispatch without consuming the ticket. See [architecture](docs/architecture.md).
 
 ## Audit verification
 
@@ -67,6 +67,7 @@ Replace `HEX` with the expected head obtained through a trusted channel. Verific
 - [Architecture and API contract](docs/architecture.md)
 - [Threat model](docs/threat-model.md)
 - [Security properties and test mapping](docs/security-properties.md)
+- [Evidence model](docs/evidence-model.md)
 - [Limitations](docs/limitations.md)
 - [Demo guide](docs/demo-guide.md)
 - [Design decisions](docs/design-decisions.md)

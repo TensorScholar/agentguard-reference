@@ -1,9 +1,12 @@
+import hashlib
+import hmac
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from agentguard_reference import AuditLog, verify_records
 from agentguard_reference.audit import ZERO_HEAD, record_mac
+from agentguard_reference.domain import canonical
 
 KEY = b"audit-unit-test-key-not-secret!!!" * 2
 
@@ -185,3 +188,17 @@ class AuditTests(unittest.TestCase):
             {f"local-{index}" for index in range(256)},
         )
         self.assertTrue(verify_records(records, KEY, expected_head=audit.head))
+
+    def test_authorization_domain_separator_is_not_audit_mac(self) -> None:
+        payload = {
+            "sequence": 1, "previous": ZERO_HEAD, "event": "decision.denied",
+            "authorization_id": "local", "action_digest": self.digest,
+            "reason": "policy.unknown_action",
+        }
+        authorization_mac = hmac.new(
+            KEY, b"agentguard-reference:authorization:v1\0" + canonical(payload).encode("ascii"),
+            hashlib.sha256,
+        ).hexdigest()
+        self.assertNotEqual(record_mac(payload, KEY), authorization_mac)
+        record = {**payload, "mac": authorization_mac}
+        self.assertFalse(verify_records([record], KEY))

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.1
+
+This entry describes the standalone implementation and release workflow, not test results or a packaging attestation.
+
+- Serialized single-use `ReplayStore.claim`: the clock is sampled while the store lock is held. Lifetime predicate failure does not consume the authorization identifier.
+- Identity strings reject surrounding whitespace and ASCII control characters.
+- Audit chain head advances only after the record is appended.
+- Callback `BaseException` after admission appends `execution.unknown` with `executor.interrupted` and re-raises.
+- Evidence model document; authorization treated as an admission ticket distinct from reservation and from callback return.
+- Tests for non-consuming expiry, policy revision change, admission clock sampling, invalid guard configuration, and interruption.
+
 ## 1.0.0
 
 This entry describes the standalone implementation and release workflow, not test results or a packaging attestation.

@@ -13,7 +13,7 @@ The demo uses an in-memory callback and a public illustrative HMAC key. JSON con
 
 The API uses keyword-only `Action.create(principal=..., name=..., audience=..., arguments=...)` and `Guard(policy=..., key=..., clock=..., nonce_factory=...)`. `authorize` returns a decision; `execute` passes a fresh arguments dictionary to the callback and returns status, reason, and whether the executor was called. See the [API contract](../docs/architecture.md).
 
-The policy is a refund demonstration, not identity authentication. Principal and provenance are asserted by a trusted caller, with no prompt classification. Only callback return plus successful outcome audit permits `succeeded`; callback failure or outcome audit failure produces `unknown`. Consumed authorization is never released, and replay protection covers only the same in-memory store in one process.
+The policy is a refund demonstration, not identity authentication. Principal and provenance are asserted by a trusted caller, with no prompt classification. Only callback return plus successful outcome audit permits `succeeded`; callback failure or outcome audit failure produces `unknown`. Consumed authorization is never released, expiry does not consume the ticket, and replay protection covers only the same in-memory store in one process.
 
 In the activated environment, verify separately supplied inputs with `python -m agentguard_reference verify FILE --key-file KEY_FILE --expected-head HEX`. Use raw external key bytes and an independently trusted expected head, never embedded key material. HMAC key holders can forge records.
 

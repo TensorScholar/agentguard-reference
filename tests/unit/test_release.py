@@ -14,6 +14,7 @@ SPEC.loader.exec_module(BUILDER)
 class ReleaseTests(unittest.TestCase):
     def test_source_inventory_excludes_generated_and_private_material(self):
         files = BUILDER.collect(ROOT)
+        self.assertIn("docs/evidence-model.md", files)
         self.assertIn("LICENSE", files)
         self.assertIn("pyproject.toml", files)
         self.assertIn("examples/quickstart.py", files)

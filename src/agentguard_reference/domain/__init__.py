@@ -14,7 +14,8 @@ def digest(value: Any) -> str:
 
 
 def identity(value: str) -> None:
-    if type(value) is not str or not value.strip() or len(value) > 256:
+    if (type(value) is not str or not value or value != value.strip() or len(value) > 256
+            or any(ord(char) < 32 or ord(char) == 127 for char in value)):
         raise ValueError("identity must be a nonempty string of at most 256 characters")
 
 

@@ -1,6 +1,6 @@
 # Reproducibility
 
-Commands describe the standalone 1.0.0 verification and packaging workflow, not evidence that a release has passed. No sibling checkout or provider account is required.
+Commands describe the standalone 1.0.1 verification and packaging workflow, not evidence that a release has passed. No sibling checkout or provider account is required.
 
 ## Environment and installation
 
@@ -68,7 +68,7 @@ make release PYTHON=.venv/bin/python
 The Makefile declares `release: verify`, so release first runs the entire verification gate, then executes:
 
 ```sh
-python scripts/build_release.py
+python scripts/build_release.py [output-directory]
 ```
 
 The release artifact contract is:
@@ -79,5 +79,7 @@ The release artifact contract is:
 - `MANIFEST.sha256` inside the ZIP: the packaged-file inventory, excluding itself.
 
 The release collector includes the license, package configuration, source, tests, examples, documentation, and release script. It excludes Git history, virtual environments, bytecode, caches, generated package metadata, and release outputs. It rejects symlinks, unapproved file types in source directories, and selected private-path or credential markers. These checks complement manual review; they are not an exhaustive secret scanner. Entries use fixed timestamps, permissions, ordering, and uncompressed storage to make repeated builds from identical source byte-identical.
+
+An optional output directory argument writes the archive outside the package tree. The ZIP contains only the public artifact under `agentguard-reference/`. External siblings `agentguard-reference-final.zip.sha256` and `agentguard-reference-final.manifest.txt` are not ZIP members.
 
 Before publication, compare manifest digests with archive members and the external inventory, verify the archive checksum, and inspect membership for unintended secrets or excluded material. Test installation and the CLI from the packaged source in a fresh isolated environment. A SHA256 inventory is not a publisher signature; byte-identical archives across environments are not promised. Keep actual run results separate from workflow descriptions and apply the [publication review](publication-review.md).

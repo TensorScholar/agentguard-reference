@@ -1,6 +1,6 @@
 # Threat model
 
-This threat model describes the standalone 1.0.0 reference package. Controls below map to the current tests, not reported test results.
+This threat model describes the standalone 1.0.1 reference package. Controls below map to the current tests, not reported test results.
 
 ## Assets and boundary
 
@@ -16,7 +16,8 @@ The trusted caller supplies principal and provenance assertions, policy, key, cl
 | Change policy while retaining the revision label | Fingerprint of current policy configuration | Policy source remains trusted |
 | Request a disallowed action, wrong audience, or excessive refund | Explicit policy denial | Policy expresses only the supplied constraints |
 | Present expired or tampered authorization | Lifetime and HMAC validation before dispatch | Trusted key and clock required |
-| Replay authorization, including concurrent reuse | Atomic consume before callback; never release | Same store, same process only |
+| Replay authorization, including concurrent reuse | Atomic `claim` before callback; clock sampled while the store lock is held; never release | Same store, same process only |
+| Use an expired ticket at the reservation boundary | Lifetime predicate evaluated inside `claim`; failure does not consume the identifier | Trusted clock required |
 | Use malformed, floating-point, oversized, or deeply nested inputs | Strict bounded input validation | Not a general host-level denial-of-service defense |
 | Proceed when authorization or dispatch auditing fails | Fail closed before callback | No claim of durable audit storage |
 | Treat callback exception or outcome audit failure as success | Return `unknown` after dispatch | No automatic retry or effect reconciliation |
@@ -34,7 +35,7 @@ The trusted caller supplies principal and provenance assertions, policy, key, cl
 
 ## Outside the boundary
 
-No protection is claimed against compromised hosts, malicious key holders, direct provider calls, malicious executors, restart replay, cross-process replay, or independent in-memory stores. There are no provider adapters, external identity integrations, persistent coordination, or business-effect reconciliation.
+No protection is claimed against compromised hosts, malicious key holders, direct provider calls, malicious executors, restart replay, cross-process replay, or independent in-memory stores. There are no provider adapters, external identity integrations, persistent coordination, credential issuance, or business-effect reconciliation.
 
 Prompt injection is not solved as a class. A malicious proposal that satisfies the configured policy can still be allowed; policy compliance is not proof that the proposal matches a person's intent.
 

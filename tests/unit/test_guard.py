@@ -114,7 +114,10 @@ class GuardTests(unittest.TestCase):
         self.callback.assert_not_called()
 
     def test_nonstring_identities_rejected(self) -> None:
-        values: list[Any] = [None, True, 1, [], "", "   ", "x" * 257]
+        values: list[Any] = [
+            None, True, 1, [], "", "   ", " ident", "ident ", "ident\n",
+            "ident\x00", "ident\t", "x" * 257,
+        ]
         for field in ("principal", "name", "audience"):
             for value in values:
                 with self.subTest(field=field, value=value):
@@ -308,3 +311,87 @@ class GuardTests(unittest.TestCase):
                 self.assert_denied(
                     self.guard.execute(self.action, value, self.callback), "execution.invalid_input"
                 )
+
+    def test_policy_revision_change_denies(self) -> None:
+        authorization = self.guard.authorize(self.action).authorization
+        policy = replace(self.policy, revision="reference-v2")
+        self.assertEqual(policy.allowed_actions, self.policy.allowed_actions)
+        self.assertNotEqual(policy.fingerprint, self.policy.fingerprint)
+        guard = Guard(policy=policy, key=KEY, clock=lambda: self.now)
+        self.assert_denied(
+            guard.execute(self.action, authorization, self.callback),
+            "authorization.policy_changed",
+        )
+
+    def test_expiry_does_not_consume_authorization(self) -> None:
+        authorization = self.guard.authorize(self.action).authorization
+        self.now = 1060.0
+        self.assert_denied(
+            self.guard.execute(self.action, authorization, self.callback),
+            "authorization.invalid_time",
+        )
+        self.now = 1000.0
+        result = self.guard.execute(self.action, authorization, self.callback)
+        self.assertEqual(result.status, "succeeded")
+        self.assertTrue(result.executor_called)
+        self.callback.assert_called_once_with(self.action.arguments)
+
+    def test_guard_rejects_invalid_configuration(self) -> None:
+        keys: list[Any] = [None, "x" * 32, b"", b"x" * 31, bytearray(b"x" * 32)]
+        for key in keys:
+            with self.subTest(key=key):
+                with self.assertRaises(ValueError):
+                    Guard(policy=self.policy, key=key, clock=lambda: self.now)
+        with self.assertRaises(ValueError):
+            Guard(policy=cast(Any, "policy"), key=KEY, clock=lambda: self.now)
+        self.callback.assert_not_called()
+
+    def test_padded_nonce_fails_issuance(self) -> None:
+        for nonce in ("", "   ", " nonce", "nonce ", "nonce\n"):
+            with self.subTest(nonce=nonce):
+                guard = Guard(
+                    policy=self.policy, key=KEY, clock=lambda: self.now,
+                    nonce_factory=lambda value=nonce: value,
+                )
+                decision = guard.authorize(self.action)
+                self.assertFalse(decision.allowed)
+                self.assertEqual(decision.reason, "authorization.issuance_failed")
+                self.assertIsNone(decision.authorization)
+        self.callback.assert_not_called()
+
+    def test_keyboardinterrupt_records_unknown_and_consumes(self) -> None:
+        authorization = self.guard.authorize(self.action).authorization
+        failing = Mock(side_effect=KeyboardInterrupt())
+        with self.assertRaises(KeyboardInterrupt):
+            self.guard.execute(self.action, authorization, failing)
+        failing.assert_called_once_with(self.action.arguments)
+        self.assert_denied(
+            self.guard.execute(self.action, authorization, self.callback),
+            "authorization.replayed",
+        )
+        events = [record["event"] for record in self.guard.audit.snapshot()]
+        self.assertIn("execution.unknown", events)
+        self.assertEqual(
+            [record["reason"] for record in self.guard.audit.snapshot()
+             if record["event"] == "execution.unknown"],
+            ["executor.interrupted"],
+        )
+
+    def test_duplicate_nonce_second_ticket_is_replay(self) -> None:
+        guard = Guard(
+            policy=self.policy, key=KEY, clock=lambda: self.now,
+            nonce_factory=lambda: "fixed-authorization-id",
+        )
+        first = guard.authorize(self.action)
+        second = guard.authorize(self.action)
+        self.assertTrue(first.allowed and second.allowed)
+        assert first.authorization is not None and second.authorization is not None
+        self.assertEqual(first.authorization.id, second.authorization.id)
+        result = guard.execute(self.action, first.authorization, self.callback)
+        self.assertEqual(result.status, "succeeded")
+        other = Mock()
+        replayed = guard.execute(self.action, second.authorization, other)
+        self.assertEqual((replayed.status, replayed.reason), ("denied", "authorization.replayed"))
+        self.assertFalse(replayed.executor_called)
+        other.assert_not_called()
+        self.callback.assert_called_once_with(self.action.arguments)

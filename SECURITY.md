@@ -1,6 +1,6 @@
 # Security
 
-AgentGuard Reference 1.0.0 is a bounded, standalone reference implementation, not a production-certified security system. Its implementation contract and assumptions are in [the threat model](docs/threat-model.md), [security properties](docs/security-properties.md), and [limitations](docs/limitations.md).
+AgentGuard Reference 1.0.1 is a bounded, standalone reference implementation, not a production-certified security system. Its implementation contract and assumptions are in [the threat model](docs/threat-model.md), [security properties](docs/security-properties.md), [evidence model](docs/evidence-model.md), and [limitations](docs/limitations.md).
 
 ## Reporting
 
@@ -17,7 +17,7 @@ Report suspected vulnerabilities privately to the repository maintainers through
 
 ## Execution boundaries
 
-Authorization and dispatch audit failures must prevent callback dispatch. Callback exceptions or outcome audit failure after dispatch must not be reported as success: the outcome is `unknown`. Consumed authorization is never released for retry.
+Authorization and dispatch audit failures must prevent callback dispatch. Callback exceptions or outcome audit failure after dispatch must not be reported as success: the outcome is `unknown`. `BaseException` after admission appends `execution.unknown` and is re-raised. Consumed authorization is never released for retry. Expiry at the reservation boundary does not consume the ticket.
 
 Single-use locking covers only the same in-memory store within the same process. Restarts, independent stores, multiple processes, direct callback invocation, compromised hosts, and malicious executors are outside that guarantee. Invalid inputs, floats, and values exceeding bounded JSON limits must be rejected.
 

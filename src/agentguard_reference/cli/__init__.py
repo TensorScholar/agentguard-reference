@@ -5,7 +5,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from .. import Action, Guard, Policy, verify_records
+from .. import Action, Guard, Policy, __version__, verify_records
 
 DEMO_KEY = b"public-demo-key-not-for-real-use!!"
 
@@ -20,7 +20,8 @@ def demo() -> dict[str, Any]:
     first = guard.execute(action, decision.authorization, calls.append)
     replay = guard.execute(action, decision.authorization, calls.append)
     records = guard.audit.snapshot()
-    return {"schema": "agentguard-reference-demo-v1", "key_warning": "public illustrative key",
+    return {"schema": "agentguard-reference-demo-v1", "package_version": __version__,
+            "key_warning": "public illustrative key",
             "decision": asdict(decision), "results": [asdict(first), asdict(replay)],
             "executor_calls": len(calls), "records": records, "head": guard.audit.head,
             "verified": verify_records(records, DEMO_KEY, expected_head=guard.audit.head)}

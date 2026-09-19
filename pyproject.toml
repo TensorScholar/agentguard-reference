@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentguard-reference"
-version = "1.0.0"
+version = "1.0.1"
 description = "An auditable reference for bounded AI agent execution authorization"
 readme = "README.md"
 requires-python = ">=3.11"

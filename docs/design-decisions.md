@@ -1,6 +1,6 @@
 # Design decisions
 
-These decisions describe the standalone 1.0.0 implementation, not additional architecture or validation results. The `agentguard_reference` namespace avoids collisions with other `agentguard` imports; an isolated `.venv` keeps dependencies separate without relying on another checkout.
+These decisions describe the standalone 1.0.1 implementation, not additional architecture or validation results. The `agentguard_reference` namespace avoids collisions with other `agentguard` imports; an isolated `.venv` keeps dependencies separate without relying on another checkout.
 
 ## A small standalone package
 
@@ -14,7 +14,7 @@ An agent supplies a proposal. The current `Policy` is a refund demonstration, no
 
 `Action.create(principal=..., name=..., audience=..., arguments=...)` captures immutable JSON. Principal, name, audience, and all arguments are bound together so that an authorization cannot be transferred to a different structured action. Caller-owned nested mutations must not affect the snapshot.
 
-Bounded JSON and explicit validation avoid silent coercion. Floats are disallowed; refund values use integer minor units. Invalid values are rejected rather than normalized into new authority. Canonical ASCII arguments are capped at 65536 characters, nesting at depth 16 (root 0), containers at 1024 entries, and nonblank identity strings at 256 characters. Policy numeric limits are strict integers in `1..2**53`.
+Bounded JSON and explicit validation avoid silent coercion. Floats are disallowed; refund values use integer minor units. Invalid values are rejected rather than normalized into new authority. Canonical ASCII arguments are capped at 65536 characters, nesting at depth 16 (root 0), containers at 1024 entries, and nonempty identity strings at 256 characters without surrounding whitespace or ASCII control characters. Policy numeric limits are strict integers in `1..2**53`.
 
 ## Bind current policy, not just a label
 
@@ -24,7 +24,7 @@ The policy fingerprint covers the current configuration, including the allowlist
 
 `authorize` returns `Decision(allowed, reason, authorization)` conceptually; `execute` returns `ExecutionResult(status, reason, executor_called)`. These field summaries do not specify positional constructors. Issuing authorization does not call the executor, and possession of authorization is not a success result.
 
-The execution path rechecks bindings and lifetime, then consumes single-use authority before calling the callback. Consumption is never undone. This favors preventing repeated dispatch through the same store over transparent retries after uncertain outcomes.
+The execution path rechecks bindings, then claims single-use authority while sampling the clock under the store lock before calling the callback. Consumption is never undone. Expiry at that reservation boundary does not consume the ticket. This favors preventing repeated dispatch through the same store over transparent retries after uncertain outcomes. `BaseException` after admission appends `execution.unknown` with `executor.interrupted` and re-raises.
 
 ## Explicitly local replay state
 
@@ -32,7 +32,7 @@ The in-memory lock protects only the same store in the same process. It is inten
 
 ## Audit gates admission, not external truth
 
-Authorization audit failure prevents usable authority. Dispatch audit failure prevents callback invocation. After dispatch, callback exception or outcome audit failure returns `unknown`, not a fabricated success or a claim that nothing happened.
+Authorization audit failure prevents usable authority. Dispatch audit failure prevents callback invocation. After dispatch, callback exception, interruption, or outcome audit failure is not reported as success. The chain head is updated only after the record is appended.
 
 `succeeded` requires a returned callback and successful outcome audit. It does not certify a provider-side effect. There is no automatic retry, rollback, or reconciliation contract.
 

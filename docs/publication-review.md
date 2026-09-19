@@ -1,15 +1,15 @@
 # Publication review
 
-This review defines general inclusion decisions for the standalone `agentguard-reference` 1.0.0 package. It is not an assertion that cleanup, testing, or release review has completed. It contains no private implementation details.
+This review defines general inclusion decisions for the standalone `agentguard-reference` 1.0.1 package. It is not an assertion that cleanup, testing, or release review has completed. It contains no private implementation details.
 
 ## KEEP
 
 - The small public `agentguard_reference` package and its `domain`, `engine`, `audit`, and `cli` responsibilities.
 - Standard-library runtime code for Python >=3.11 and explicit public development dependencies.
 - Immutable action binding, current-policy fingerprints, strict bounded JSON, and integer minor-unit amounts.
-- Single-use same-store, same-process dispatch and explicit outcome semantics.
+- Single-use same-store, same-process dispatch, serialized admission-time sampling, and explicit outcome semantics.
 - Synthetic examples, public test fixtures, unittest/pytest suites, and reproducible verification commands.
-- Architecture, threat model, limitations, security-property mapping, security reporting guidance, and release integrity inventory.
+- Architecture, threat model, limitations, evidence model, security-property mapping, security reporting guidance, and release integrity inventory.
 
 ## REFINE
 
@@ -28,7 +28,7 @@ This review defines general inclusion decisions for the standalone `agentguard-r
 - Legacy harnesses, sibling-checkout workflows, unfinished experiments, placeholders, and unsupported integrations.
 - Generated or historical artifacts presented as evidence of current behavior.
 - Fabricated test results, benchmark numbers, validation levels, or release attestations.
-- Provider integration claims, durable or distributed replay claims, and exactly-once business-effect guarantees.
+- Provider integration claims, durable or distributed replay claims, credential issuance, and exactly-once business-effect guarantees.
 - Claims of universal prompt-injection protection, non-repudiation from HMAC, or production certification.
 
 ## Publication gate
