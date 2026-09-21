@@ -2,15 +2,15 @@
 
 Supported:
 
-- Authorize returns a decision; execute re-binds the immutable snapshot before callback.
-- Single-use ticket claim under in-process store lock; lifetime failure does not consume.
-- Auth/dispatch audit failures fail closed; post-dispatch outcome audit failure → unknown.
-- Stdlib-only runtime; `make verify` runs pytest, ruff, mypy, demo.
+- Snapshot equality at execute; mutation denies without calling executor
+- Single-use in-process claim; lifetime failure does not consume
+- Auth/dispatch audit fail-closed; post-dispatch outcome audit fail → unknown
+- `make verify`: pytest · ruff · mypy · demo
 
 Not claimed:
 
-- Production certification or release attestation
-- Distributed multi-node ticket authority
-- Identity authentication or prompt classification
-- External business-effect proof on status=succeeded
-- Trust in demo/synthetic HMAC keys
+- Production certification
+- Cross-process / persistent tickets
+- External business-effect proof on succeeded
+- Identity authentication
+- Trust in demo HMAC keys

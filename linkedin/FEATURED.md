@@ -4,20 +4,19 @@
 
 ## One-line
 
-Bind an authorized structured action to a single guarded callback dispatch. Authorize ≠ execute. Stdlib only.
+Immutable action snapshot bound to a single guarded callback. Authorize ≠ execute. Stdlib only.
 
-## Proof moment
+## Proof path
 
 ```bash
 python -m pip install '.[dev]'
 make verify
-python -m agentguard_reference demo
 ```
 
 ## Invariant
 
-Immutable action snapshot re-checked at execute. Single-use ticket in-process. Status: denied · succeeded · unknown.
+Execute re-binds the authorized snapshot. Single-use in-process. denied · succeeded · unknown.
 
 ## Non-claims
 
-Not production certification. Not identity provider. HMAC verify capability implies forge capability—use external key + trusted head.
+Not production certification. Not cross-process tickets. Not business-effect proof. Demo HMAC key is not evidence.
