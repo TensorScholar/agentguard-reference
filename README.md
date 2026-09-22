@@ -4,6 +4,8 @@
 
 The `agentguard_reference` namespace avoids import collisions with other `agentguard` packages and keeps the reference independent. These documents describe the implementation, not a release attestation or production certification.
 
+AgentGuard Reference is a minimal public example of one guarded callback. It is separate from the canonical AgentGuard Core implementation. Package `1.0.1` names this reference artifact only. It is not a newer version of that core.
+
 ## Install and run
 
 From the package root, use an isolated environment:
