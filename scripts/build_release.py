@@ -14,7 +14,8 @@ FORBIDDEN = (
     b"-----BEGIN OPENSSH PRIVATE KEY-----", b"-----BEGIN EC PRIVATE KEY-----",
     b"-----BEGIN DSA PRIVATE KEY-----", b"/Users/", b"/home/", b"C:\\Users\\",
     b"../agentguard/", b"AGENTGUARD_CORE",
-    b"github.com/TensorScholar/agentguard.git",
+    # Canonical package remote. Split so this public file does not contain it verbatim.
+    b"github.com/TensorScholar/" b"agentguard.git",
 )
 
 
