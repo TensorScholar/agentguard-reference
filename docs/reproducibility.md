@@ -77,10 +77,15 @@ python scripts/build_release.py [output-directory]
 python scripts/validate_archive.py
 ```
 
-`archive-check` has two layers, and it is worth being precise about why:
+`archive-check` has two layers. The first is mandatory and tracked; the second is optional, local, and its absence is expected.
 
-- `scripts/validate_archive.py` is tracked and mandatory. It fails closed on a missing archive, an archive whose members differ from the working tree, a broken manifest, an archive whose README lacks the AgentGuard Core relationship statement, a changelog that presents a superseded `1.x` heading, and a non-reproducible build. None of those rules requires naming a private identifier, so this file is safe to track and to read.
-- `.release/guard.py` is untracked by necessity. It holds the exact forbidden markers, so it is gitignored and never archived; a denylist that is itself published defeats its purpose. `make archive-check` runs it when it is present and prints a notice when it is not. The tracked content policy in `scripts/build_release.py` covers the same leak *shapes* without the markers, by deriving the package-family stem from this package's own declared name.
+**Layer 1 — tracked and mandatory.** `scripts/validate_archive.py` fails closed on a missing archive, an archive whose members differ from the working tree, a broken manifest, an archive whose README lacks the AgentGuard Core relationship statement, a changelog that presents a superseded `1.x` heading, and a non-reproducible build. None of those rules requires naming a private identifier, so this file is safe to track and to read. This layer alone is sufficient to produce a correct public artifact.
+
+**Layer 2 — local, optional, never committed.** `.release/guard.py` additionally checks for *exact* forbidden markers. It holds those markers itself, so it is gitignored, is not tracked in any commit, is not in the archive, the sdist, or the wheel, and is not required for a fresh clone to build, verify, or release.
+
+**Seeing `archive-check: exact private-marker layer NOT RUN (.release/guard.py absent)` is the expected result for anyone who has not cloned a maintainer workstation.** It is a notice, not a failure: `make release` still exits 0. The reason for the split is structural. A denylist that is itself published defeats its purpose, so the exact markers cannot live in any tracked or shipped file. The tracked policy in `scripts/build_release.py` covers the same leak *shapes* without naming them, by deriving the package-family stem from this package's own declared distribution name. Layer 2 is defence in depth for whoever holds the private remote, not a prerequisite for correctness.
+
+If you maintain this package and want layer 2 active, recreate `.release/guard.py` locally; it is deliberately not recoverable from the repository.
 
 No check in either layer skips. A missing archive is a failure, not a skip.
 

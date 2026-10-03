@@ -115,6 +115,14 @@ These entries change documentation and naming. `engine`, `domain`, and `audit` b
   are absent here by design, so their absence reads as scope rather than oversight.
 - The property-to-test map now covers every test method in the suite.
 
+### Release tooling note
+
+The publication guard is optional and untracked by necessity. `make release` prints
+`exact private-marker layer NOT RUN` when `.release/guard.py` is absent, which is the
+expected result on any machine that is not the maintainer's. The tracked layer is
+sufficient to produce a correct artifact; the guard is defence in depth. This is now
+documented in [reproducibility](docs/reproducibility.md).
+
 ### Documentation sculpture
 
 Documentation and packaging only. No runtime behaviour changed, and no test method was added or removed.
