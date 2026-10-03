@@ -115,6 +115,26 @@ These entries change documentation and naming. `engine`, `domain`, and `audit` b
   are absent here by design, so their absence reads as scope rather than oversight.
 - The property-to-test map now covers every test method in the suite.
 
+### Documentation sculpture
+
+Documentation and packaging only. No runtime behaviour changed, and no test method was added or removed.
+
+- Deleted `docs/publication-review.md`. It was an internal inclusion-decision memo with
+  no technical fact an external reader needs, and it duplicated exclusions that
+  [limitations](docs/limitations.md) already states.
+- Deleted `linkedin/`. Marketing collateral does not belong inside a security artifact,
+  and its claims duplicated the README and the property map.
+- The repeated load-bearing statements are now stated in full in exactly the three
+  places a reader must not miss them — the README first screen, the threat model's
+  first section, and the limitations — and cross-referenced elsewhere.
+- The README's Public API section is split into three labelled subsections: snapshot
+  limits, policy scope, and lifetime semantics.
+- The property-to-test map is grouped into nine property classes. Coverage is
+  unchanged and still complete: every test method appears in exactly one row.
+- Repaired two table rows whose property-name cell had been duplicated by an earlier
+  scripted edit, and removed a paragraph describing a pytest marker that no longer
+  exists.
+
 ## What 0.1.0 contains
 
 - Distribution `agentguard-reference`; import package `agentguard_reference`;
