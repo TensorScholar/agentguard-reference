@@ -13,7 +13,6 @@ dist/
 
 .agentguard/
 **/.agentguard_workspace/
-.showcase-workspaces/
 *.sqlite
 *.sqlite-journal
 *.pem
@@ -23,3 +22,6 @@ tmp/
 .validation/
 release/
 .benchmarks/
+
+# Publication guard: holds leakage markers, must never be archived.
+.release/

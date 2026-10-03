@@ -1,4 +1,7 @@
-# Claims summary — agentguard-reference @267e755 (v1.0.1)
+# Claims summary — agentguard-reference 0.1.0
+
+Claims map to the property-to-test table in `docs/security-properties.md`. This
+file is not AgentGuard Core and does not describe a release of it.
 
 Supported:
 

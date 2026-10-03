@@ -1,6 +1,6 @@
 # Featured capsule — AgentGuard reference
 
-**Pin:** `267e755` · **v1.0.1**
+**Version:** 0.1.0 · reference artifact, not AgentGuard Core
 
 ## One-line
 

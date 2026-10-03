@@ -1,6 +1,6 @@
 # Design decisions
 
-These decisions describe the standalone 1.0.1 implementation, not additional architecture or validation results. The `agentguard_reference` namespace avoids collisions with other `agentguard` imports; an isolated `.venv` keeps dependencies separate without relying on another checkout.
+These decisions describe the standalone 0.1.0 implementation, not additional architecture or validation results. The `agentguard_reference` namespace avoids collisions with the separate AgentGuard Core distribution; an isolated `.venv` keeps dependencies separate without relying on another checkout.
 
 ## A small standalone package
 
@@ -29,6 +29,12 @@ The execution path rechecks bindings, then claims single-use authority while sam
 ## Explicitly local replay state
 
 The in-memory lock protects only the same store in the same process. It is intentionally not described as crash-safe, persistent, distributed, or exactly-once execution. A new process or independent store is outside this guarantee.
+
+Four consequences of that decision are named hazards with executable evidence rather than caveats: cross-store replay, `fork()` before consumption double-dispatching a ticket, deadlock from a clock that re-enters the store, and unbounded growth in both stores. They are stated in [the threat model](threat-model.md).
+
+## The executor is trusted, and binding is a record
+
+The guard binds and records the arguments it dispatches. It does not constrain what the callback does with them, and it is not an enforcement boundary. We state this explicitly because "the executor receives the bound arguments" is the sentence most likely to be over-read as containment. Consequence: a caller that invokes its executor directly bypasses every property here. See [limitations](limitations.md).
 
 ## Audit gates admission, not external truth
 

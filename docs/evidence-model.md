@@ -1,6 +1,6 @@
 # Evidence model
 
-This document describes the standalone `agentguard-reference` 1.0.1 audit evidence. It is not a publisher attestation, not a business-effect proof, and not a production certification.
+This document describes the standalone `agentguard-reference` 0.1.0 audit evidence. It is not a publisher attestation, not a business-effect proof, and not a production certification.
 
 ## What a record is
 
@@ -34,14 +34,21 @@ SHA256("agentguard-reference:chain:v1\0" || canonical(record_including_mac))
 
 Authorization signatures use a different domain (`agentguard-reference:authorization:v1`). An authorization MAC is not a valid audit MAC.
 
-Verification (`verify_records`) requires:
+Verification (`verify_records`) answers one of two questions, selected by whether `expected_head` is supplied.
 
-1. An external key of at least 32 bytes.
-2. Strict field presence and types.
-3. Sequence continuity from 1.
-4. Previous-head linkage from the zero head.
-5. Successful MAC comparison for every record.
-6. Optionally, a trusted expected head for the chain endpoint.
+### Integrity of the presented prefix — no `expected_head`
+
+`verify_records(records, key)`, and its explicitly-named alias `verify_prefix(records, key)`, check that each presented record has the exact schema, that sequence runs from 1, that `previous` links from the zero head, and that every MAC is valid under the key.
+
+What this establishes is the integrity of the records **presented**. It establishes nothing about completeness. A shorter authentic chain verifies just as well as the full one, so removing records from the end is invisible. `verify_prefix` is the honest name for this mode and is provided so the weaker question is visible at the call site.
+
+### Integrity and completeness — with `expected_head`
+
+`verify_records(records, key, expected_head=HEX)` additionally requires the final computed head to equal `HEX`. A chain truncated to an earlier valid prefix then fails. This is the only way trailing-record removal is detected.
+
+`HEX` must come from a channel the verifier trusts. A head copied from the document being verified, or from any source the artifact controls, anchors nothing: an attacker who can choose the head can supply the head of the shorter chain they left behind.
+
+In short: **integrity without a head, completeness with a trusted one.** Neither mode says anything about whether records from another process, host, or store are absent.
 
 A valid prefix under the key is not completeness. Truncation to an earlier authentic prefix verifies unless the expected head is supplied and matches the intended endpoint. Anyone who holds the HMAC key can forge records. HMAC is shared-secret authentication, not a public signature and not non-repudiation.
 
@@ -64,7 +71,10 @@ A verified chain does not prove:
 - that a prompt or document expressed genuine human intent;
 - that the key holder was honest;
 - that records from another process, host, or store are absent;
-- that consumed authorization cannot be replayed after restart or against a different store.
+- that consumed authorization cannot be replayed after restart or against a different store;
+- that records are retained for any particular period. The log is an in-memory list with no bound and no eviction, so it ends with the process, and trailing records can be lost without any record of the loss inside the chain itself.
+
+A verified chain says nothing about the executor. `executor` is trusted process code with full host authority; what is bound and recorded is the argument value that was dispatched, not the behaviour of the code that received it. See [limitations](limitations.md).
 
 `ExecutionResult.status == "succeeded"` means the local callback returned and the success audit record was appended. It is not provider confirmation. `unknown` means dispatch occurred and the guarded outcome could not be confirmed; it is not evidence that no effect occurred and not permission to retry the same authorization.
 

@@ -4,12 +4,38 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentguard-reference"
-version = "1.0.1"
-description = "An auditable reference for bounded AI agent execution authorization"
+description = "A minimal stdlib-only reference for one guarded callback boundary. Not AgentGuard Core. Not production software."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "TensorScholar" }]
+keywords = [
+    "security",
+    "authorization",
+    "audit",
+    "reference-implementation",
+    "agentguard-reference",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Security",
+    "Typing :: Typed",
+]
 dependencies = []
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/TensorScholar/agentguard-reference"
+Source = "https://github.com/TensorScholar/agentguard-reference"
+Issues = "https://github.com/TensorScholar/agentguard-reference/issues"
+Changelog = "https://github.com/TensorScholar/agentguard-reference/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = ["pytest==8.4.2", "ruff==0.12.12", "mypy==1.17.1", "build==1.3.0"]
@@ -17,8 +43,14 @@ dev = ["pytest==8.4.2", "ruff==0.12.12", "mypy==1.17.1", "build==1.3.0"]
 [project.scripts]
 agentguard-reference = "agentguard_reference.cli:main"
 
+[tool.setuptools.dynamic]
+version = { attr = "agentguard_reference.__version__" }
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+agentguard_reference = ["py.typed"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

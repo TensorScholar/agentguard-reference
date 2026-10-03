@@ -1,6 +1,6 @@
 # Security
 
-AgentGuard Reference 1.0.1 is a bounded, standalone reference implementation, not a production-certified security system. Its implementation contract and assumptions are in [the threat model](docs/threat-model.md), [security properties](docs/security-properties.md), [evidence model](docs/evidence-model.md), and [limitations](docs/limitations.md).
+AgentGuard Reference 0.1.0 is a bounded, standalone reference implementation, not a production-certified security system. It is not AgentGuard Core and is not a newer version of it. Its implementation contract and assumptions are in [the threat model](docs/threat-model.md), [security properties](docs/security-properties.md), [evidence model](docs/evidence-model.md), and [limitations](docs/limitations.md).
 
 ## Reporting
 

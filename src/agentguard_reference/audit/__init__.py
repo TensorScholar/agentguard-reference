@@ -65,6 +65,25 @@ class AuditLog:
 
 def verify_records(records: list[dict[str, Any]], key: bytes, *,
                    expected_head: str | None = None) -> bool:
+    """Verify an audit record chain under an external key.
+
+    Two distinct questions, selected by whether ``expected_head`` is supplied:
+
+    * **Without ``expected_head``** — *integrity of the presented prefix only.*
+      Every presented record is checked for schema, sequence continuity from 1,
+      linkage from the zero head, and a valid MAC. What is NOT established is
+      completeness: a shorter authentic chain also verifies, so dropping trailing
+      records is invisible. ``verify_prefix`` is the explicit name for this mode.
+
+    * **With ``expected_head``** — *integrity and completeness against a trusted
+      head.* The final computed head must equal ``expected_head``, so truncation to
+      an earlier valid prefix is detected. The head must arrive through a channel
+      the caller trusts; a head copied from the untrusted input establishes nothing.
+
+    Returns ``False`` rather than raising for malformed input. Anyone holding ``key``
+    can forge records, so a ``True`` result is authentication under a shared secret,
+    not proof of external events.
+    """
     try:
         valid_key(key)
         if (type(records) is not list
@@ -89,3 +108,13 @@ def verify_records(records: list[dict[str, Any]], key: bytes, *,
         return expected_head is None or hmac.compare_digest(previous, expected_head)
     except (ValueError, TypeError, KeyError, OverflowError, RecursionError):
         return False
+
+
+def verify_prefix(records: list[dict[str, Any]], key: bytes) -> bool:
+    """Check the integrity of the presented prefix only; never claim completeness.
+
+    Exactly ``verify_records(records, key)`` with no ``expected_head``. This alias
+    exists so that the weaker question has an honest name at the call site: it says
+    nothing about whether records are missing from the end of the chain.
+    """
+    return verify_records(records, key)

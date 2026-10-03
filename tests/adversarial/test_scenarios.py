@@ -118,7 +118,7 @@ class ScenarioTests(unittest.TestCase):
                     "authorization.invalid_signature",
                 )
 
-    def test_synthetic_untrusted_provenance_denied(self) -> None:
+    def test_synthetic_asserted_untrusted_flag_is_honoured_when_set(self) -> None:
         values: list[Any] = [True, "false", "true", 0, 1, None, [], {}]
         for untrusted in values:
             with self.subTest(untrusted=untrusted):
@@ -137,7 +137,26 @@ class ScenarioTests(unittest.TestCase):
                     "execution.invalid_input",
                 )
 
-    def test_synthetic_provenance_mutation_after_authorization_denied(self) -> None:
+    def test_synthetic_asserted_untrusted_flag_is_defeatable_by_omission(self) -> None:
+        """The `untrusted` field is a caller assertion, not provenance enforcement.
+
+        It lives inside the arguments the caller supplies, so a caller that simply
+        omits it is treated as trusted. This locks the limitation documented in
+        docs/limitations.md: the flag forces provenance to be stated explicitly, and
+        nothing more. A test that only asserted the flag works when present would let
+        the documentation imply a control that does not exist.
+        """
+        omitted = self.make_action(arguments={"amount_minor": 100,
+                                             "source": "synthetic-local-document"})
+        decision = self.guard.authorize(omitted)
+        self.assertTrue(decision.allowed)
+        self.assertEqual(decision.reason, "policy.allowed")
+        self.assertIsNotNone(decision.authorization)
+        result = self.guard.execute(omitted, decision.authorization, self.callback)
+        self.assertEqual(result.status, "succeeded")
+        self.callback.assert_called_once_with(omitted.arguments)
+
+    def test_synthetic_untrusted_flag_mutation_after_authorization_denied(self) -> None:
         trusted = self.make_action(arguments={"amount_minor": 100, "untrusted": False})
         authorization = self.guard.authorize(trusted).authorization
         self.assertIsNotNone(authorization)

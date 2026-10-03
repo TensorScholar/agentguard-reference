@@ -6,10 +6,10 @@ From the package root with Python >=3.11, run the synthetic CLI demo in an isola
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install .
-python -m agentguard_reference demo
+python -m agentguard_reference
 ```
 
-The demo uses an in-memory callback and a public illustrative HMAC key. JSON contains `records`, `head`, and `results`; it is not trusted evidence or a real refund. No provider credentials or framework adapters are needed or included.
+The guided demo narrates and executes five properties: mutation blocked, exact expiry denied without consuming the ticket, replay blocked, `unknown` after dispatch, and audit tampering detected. It uses in-memory callbacks and a public illustrative HMAC key that is published in the package source, so its own verification result is a self-check, not evidence. No provider credentials or framework adapters are needed or included.
 
 The API uses keyword-only `Action.create(principal=..., name=..., audience=..., arguments=...)` and `Guard(policy=..., key=..., clock=..., nonce_factory=...)`. `authorize` returns a decision; `execute` passes a fresh arguments dictionary to the callback and returns status, reason, and whether the executor was called. See the [API contract](../docs/architecture.md).
 

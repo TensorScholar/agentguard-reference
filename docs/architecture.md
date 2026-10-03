@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the `agentguard-reference` 1.0.1 implementation. It is not a test report or production certification.
+This document describes the `agentguard-reference` 0.1.0 implementation. It is not a test report or production certification.
 
 ## Package boundary
 
@@ -14,6 +14,14 @@ The standalone import package is `agentguard_reference`, under `src/agentguard_r
 | `cli` | Synthetic demo and file verification |
 
 Runtime code uses only the Python >=3.11 standard library. There are no provider integrations, credential brokers, private package dependencies, persistent replay services, distributed coordinators, or reconciliation workers.
+
+## Scope
+
+This package is **not AgentGuard Core** and not a newer version of it. It is also not durable, not cross-process, not non-repudiable, not an effect oracle, not a credential broker, and not an MCP mediation layer. The full non-goals list, and which ideas belong to Core and are absent here by design, are in [limitations](limitations.md).
+
+## The executor is trusted code
+
+`executor` is a caller-supplied callable with the full authority of the host process. The guard binds and records the arguments it dispatches; it does not constrain what the callable does with them, and it is not an operating-system enforcement boundary. Argument binding is a **record** property, not a containment property. Stated in full, with consequences, in [the threat model](threat-model.md) and [limitations](limitations.md).
 
 ## Public interface
 
@@ -41,7 +49,7 @@ Guard(policy=policy, key=key, clock=clock, nonce_factory=nonce_factory)
 
 Arguments must be a JSON object serialized with sorted keys, compact separators, and ASCII escaping (`ensure_ascii=True`), with at most 65536 canonical characters. JSON values are strings, integers, booleans, null, lists, and string-keyed dictionaries; floats and unsupported objects are rejected. Maximum nesting depth is 16 with the root at depth 0; each list or dictionary has at most 1024 entries. `amount_minor` cannot be boolean. Constructor validation rejects these inputs; malformed or excessively nested JSON may raise parsing exceptions including `ValueError` or `RecursionError`. Bound incoming payloads before constructing actions; these limits are not a resource-isolation sandbox.
 
-The current policy is a refund demonstration, not identity authentication. It is default-deny: it allows only when the action name is in the allowlist, the audience matches, `amount_minor` is a strict integer in `1..max_amount_minor`, and `untrusted` is boolean false (default false when absent). Principal and provenance are asserted by a trusted caller; arbitrary text is not classified and no prompt classification occurs. Both `max_amount_minor` and `ttl_seconds` are strict integers in `1..2**53`, defaulting to 10000 and 60. Other integer arguments have no separate policy numeric range.
+The current policy is a refund demonstration, not identity authentication. It is default-deny: it allows only when the action name is in the allowlist, the audience matches, `amount_minor` is a strict integer in `1..max_amount_minor`, and `untrusted` is boolean false (default false when absent). The `untrusted` field is a caller assertion carried inside the arguments the caller supplies, so it is defeated by omitting it; it forces provenance to be stated explicitly and is not a control against a caller that wants to bypass it. Principal and provenance are asserted by a trusted caller; arbitrary text is not classified and no prompt classification occurs. Both `max_amount_minor` and `ttl_seconds` are strict integers in `1..2**53`, defaulting to 10000 and 60. Other integer arguments have no separate policy numeric range.
 
 Lifetime is bound to issuance: `expires_at = issued_at + ttl_seconds`, and execution requires `issued_at <= now < expires_at` with a duration no longer than the current policy TTL. Exactly at expiry, before issuance, or after expiry, dispatch is denied with `authorization.invalid_time` and the authorization is not consumed.
 
@@ -68,7 +76,7 @@ Expiry and other `claim` predicate failures do not consume the identifier. Repla
 
 The injected audit and replay stores are trusted components. Audit adapters must raise an ordinary `Exception` on failure; silent data loss is not detected. The clock callable used during `claim` must not re-enter the same store (the lock is not reentrant). Process termination after admission may still lose an in-flight outcome record if the process is killed before the handler runs. `snapshot()` and `head` are individually locked, not an atomic pair; capture them after writers quiesce.
 
-A lock makes the claim atomic only for callers using the same in-memory store in the same process. It is not a durable reservation and provides no guarantee across restarts, separate stores, or processes.
+A lock makes the claim atomic only for callers using the same in-memory store in the same process. It is not a durable reservation and provides no guarantee across restarts, separate stores, or processes. Four consequences of this are named hazards with executable evidence in [the threat model](threat-model.md) and `tests/security/test_hazards.py`: cross-store replay, `fork()` before consumption double-dispatching a ticket, deadlock from a clock that re-enters the store, and unbounded growth in `ReplayStore` and `AuditLog`. Neither store evicts, and denied `authorize` traffic still grows the audit log.
 
 ## Reason codes
 

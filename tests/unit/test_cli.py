@@ -9,7 +9,7 @@ from typing import Any
 from unittest.mock import call, patch
 
 from agentguard_reference import AuditLog
-from agentguard_reference.cli import demo, main
+from agentguard_reference.cli import demo_document, main
 
 KEY = b"cli-test-external-key-not-secret!" * 2
 
@@ -47,29 +47,119 @@ class CliTests(unittest.TestCase):
         first = self.invoke(["demo"])
         self.assertEqual(first, self.invoke(["demo"]))
         self.assertEqual(first[0], 0)
-        self.assertEqual(first[2], "")
-        document = json.loads(first[1])
-        self.assertEqual(document, demo())
-        self.assertTrue(document["verified"])
-        self.assertTrue(document["decision"]["allowed"])
-        self.assertEqual(document["executor_calls"], 1)
-        self.assertEqual([result["status"] for result in document["results"]],
-                         ["succeeded", "denied"])
-        self.assertEqual(document["results"][1]["reason"], "authorization.replayed")
+        document = json.loads(self.invoke(["demo", "--json"])[1])
+        self.assertEqual(document, demo_document())
+        self.assertTrue(document["all_properties_held"])
+        self.assertEqual(
+            [scenario["id"] for scenario in document["scenarios"]],
+            ["mutation", "expiry", "replay", "unknown", "tamper"],
+        )
         self.stat.assert_not_called()
         self.read_text.assert_not_called()
         self.read_bytes.assert_not_called()
 
     def test_demo_failure_exit_status(self) -> None:
-        for changes in ({"verified": False}, {"executor_calls": 0}, {"executor_calls": 2}):
-            with self.subTest(changes=changes):
-                document = demo()
-                document.update(changes)
-                with patch("agentguard_reference.cli.demo", return_value=document):
-                    status, output, error = self.invoke(["demo"])
+        broken = {
+            "all_properties_held": False,
+            "self_check": False,
+        }
+        for change in broken:
+            with self.subTest(change=change):
+                document = demo_document()
+                if change == "all_properties_held":
+                    document["all_properties_held"] = False
+                else:
+                    document["audit"]["self_check_under_public_demo_key"] = False
+                with patch("agentguard_reference.cli.demo_document", return_value=document):
+                    status, _output, _error = self.invoke(["demo"])
                 self.assertEqual(status, 1)
-                self.assertEqual(json.loads(output), document)
-                self.assertEqual(error, "")
+
+    def test_demo_documents_every_required_property(self) -> None:
+        document = demo_document()
+        by_id = {scenario["id"]: scenario for scenario in document["scenarios"]}
+        self.assertEqual(sorted(by_id), ["expiry", "mutation", "replay", "tamper", "unknown"])
+
+        mutation = by_id["mutation"]["observed"]
+        self.assertEqual(mutation["execution"]["reason"], "authorization.action_mismatch")
+        self.assertIs(mutation["execution"]["executor_called"], False)
+        self.assertEqual(mutation["callback_invocations"], 0)
+        self.assertNotEqual(mutation["approved_action_digest"],
+                            mutation["presented_action_digest"])
+
+        expiry = by_id["expiry"]["observed"]
+        self.assertEqual(expiry["at_exact_expiry"]["reason"], "authorization.invalid_time")
+        self.assertEqual(expiry["callback_invocations_at_boundary"], 0)
+        self.assertEqual(expiry["inside_window"]["status"], "succeeded")
+        self.assertTrue(expiry["refusal_survived_clock_reset"])
+        self.assertEqual(expiry["expires_at"], expiry["issued_at"] + 60)
+
+        replay = by_id["replay"]["observed"]
+        self.assertEqual(replay["first"]["status"], "succeeded")
+        self.assertEqual(replay["second"]["reason"], "authorization.replayed")
+        self.assertEqual(replay["third"]["reason"], "authorization.replayed")
+        self.assertEqual(replay["callback_invocations"], 1)
+
+        unknown = by_id["unknown"]["observed"]
+        self.assertEqual(unknown["execution"]["status"], "unknown")
+        self.assertEqual(unknown["execution"]["reason"], "executor.raised")
+        self.assertIs(unknown["execution"]["executor_called"], True)
+        self.assertEqual(unknown["retry"]["reason"], "authorization.replayed")
+
+        tamper = by_id["tamper"]["observed"]
+        self.assertTrue(tamper["tampered_record_rejected"])
+        self.assertTrue(tamper["wrong_key_rejected"])
+        self.assertTrue(tamper["valid_prefix_accepted_without_trusted_head"])
+        self.assertTrue(tamper["valid_prefix_rejected_with_trusted_head"])
+
+        for scenario in document["scenarios"]:
+            with self.subTest(scenario=scenario["id"]):
+                self.assertTrue(scenario["property_held"])
+                self.assertTrue(scenario["claim"])
+                self.assertTrue(scenario["lines"])
+
+    def test_demo_narrates_each_property_and_states_it_is_not_core(self) -> None:
+        status, output, error = self.invoke(["demo"])
+        self.assertEqual(status, 0)
+        for marker in (
+            "not AgentGuard Core",
+            "not a newer version of Core",
+            "authorization.action_mismatch",
+            "authorization.invalid_time",
+            "authorization.replayed",
+            "executor.raised",
+            "Callback invocations so far: 0",
+            "not permission to retry",
+            "tautology",
+            "expected head",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, output)
+        self.assertIn("HELD", output)
+        self.assertEqual(output.count("property HELD"), 5)
+
+    def test_demo_never_claims_a_bare_verification_result(self) -> None:
+        """The demo must not present a self-check under a published key as evidence."""
+        status, output, error = self.invoke(["demo"])
+        self.assertEqual(status, 0)
+        self.assertNotIn('"verified"', output)
+        self.assertNotIn("verified: true", output)
+        document = json.loads(self.invoke(["demo", "--json"])[1])
+        self.assertNotIn("verified", document)
+        self.assertIn("self_check_under_public_demo_key", document["audit"])
+        self.assertIn("not a secret", error)
+        self.assertIn("is not evidence", error)
+        self.assertEqual(error.count("\n"), 1)
+
+    def test_no_argument_invocation_runs_the_guided_demo(self) -> None:
+        with_argv = self.invoke(["demo"])
+        without_argv = self.invoke([])
+        self.assertEqual(without_argv, with_argv)
+        self.assertEqual(without_argv[0], 0)
+        self.assertIn("guided demo", without_argv[1])
+
+    def test_demo_json_and_narrative_are_both_deterministic(self) -> None:
+        self.assertEqual(self.invoke(["demo", "--json"]), self.invoke(["demo", "--json"]))
+        self.assertEqual(self.invoke(["demo"]), self.invoke(["demo"]))
 
     def test_verify_valid_array_and_document_external_key_and_head(self) -> None:
         for document in (self.records, {"records": self.records, "head": "0" * 64}):

@@ -1,6 +1,6 @@
 # Publication review
 
-This review defines general inclusion decisions for the standalone `agentguard-reference` 1.0.1 package. It is not an assertion that cleanup, testing, or release review has completed. It contains no private implementation details.
+This review defines general inclusion decisions for the standalone `agentguard-reference` 0.1.0 package. It is not an assertion that cleanup, testing, or release review has completed. It contains no private implementation details.
 
 ## KEEP
 

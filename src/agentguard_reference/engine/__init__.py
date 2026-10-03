@@ -19,9 +19,6 @@ class ReplayStore:
         self._consumed: set[str] = set()
         self._lock = threading.Lock()
 
-    def consume(self, authorization_id: str) -> bool:
-        return self.claim(authorization_id, lambda: True) == "claimed"
-
     def claim(self, authorization_id: str, admit: Callable[[], bool]) -> ClaimResult:
         if type(authorization_id) is not str:
             return "rejected"

@@ -4,7 +4,7 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from agentguard_reference import AuditLog, verify_records
+from agentguard_reference import AuditLog, verify_prefix, verify_records
 from agentguard_reference.audit import ZERO_HEAD, record_mac
 from agentguard_reference.domain import canonical
 
@@ -118,6 +118,37 @@ class AuditTests(unittest.TestCase):
             with self.subTest(head=head):
                 self.assertFalse(verify_records(self.audit.snapshot(), KEY, expected_head=head))
                 self.assertFalse(verify_records([], KEY, expected_head=head))
+
+    def test_verify_prefix_is_the_named_weak_mode(self) -> None:
+        """`verify_prefix` must be exactly `verify_records` with no expected head.
+
+        The alias exists so the weaker question has an honest name at the call site.
+        It must never be stronger than the call it wraps, or it would imply a
+        completeness guarantee it cannot make.
+        """
+        records = self.audit.snapshot()
+        self.assertTrue(verify_prefix(records, KEY))
+        self.assertEqual(verify_prefix(records, KEY), verify_records(records, KEY))
+        for truncated in (records[:-1], records[:1], []):
+            with self.subTest(length=len(truncated)):
+                self.assertEqual(verify_prefix(truncated, KEY),
+                                 verify_records(truncated, KEY))
+        self.assertFalse(verify_prefix(records, b"wrong-audit-test-key" * 3))
+        # The two modes agree on a complete chain and diverge only when records are
+        # missing from the end. That divergence is the whole difference between them.
+        self.assertEqual(verify_prefix(records, KEY),
+                         verify_records(records, KEY, expected_head=self.audit.head))
+        for truncated in (records[:-1], records[:1]):
+            with self.subTest(length=len(truncated)):
+                self.assertTrue(verify_prefix(truncated, KEY))
+                self.assertFalse(verify_records(truncated, KEY,
+                                                expected_head=self.audit.head))
+
+    def test_verify_prefix_is_exported(self) -> None:
+        import agentguard_reference
+
+        self.assertIn("verify_prefix", agentguard_reference.__all__)
+        self.assertIs(agentguard_reference.verify_prefix, verify_prefix)
 
     def test_empty_chain(self) -> None:
         audit = AuditLog(KEY)

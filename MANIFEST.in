@@ -1,0 +1,33 @@
+# Source distribution contents for agentguard-reference.
+#
+# The sdist is the reviewable form of this artifact: it ships the documentation and
+# the tests alongside the source, so a reviewer can read the threat model and execute
+# the suite without cloning anything.
+#
+# Entries are explicit. There is no `graft .`, so a directory added later cannot be
+# swept into a public artifact by accident.
+#
+# `.release/` is deliberately absent. It holds the publication guard and the exact
+# forbidden markers, and must never be distributed.
+
+include LICENSE
+include README.md
+include CHANGELOG.md
+include SECURITY.md
+include Makefile
+include pyproject.toml
+include .gitignore
+include src/agentguard_reference/py.typed
+
+recursive-include src *.py
+recursive-include docs *.md
+recursive-include tests *.py
+recursive-include examples *.py *.md
+recursive-include scripts *.py
+
+global-exclude __pycache__/*
+global-exclude *.py[cod]
+prune .release
+prune release
+prune build
+prune .git

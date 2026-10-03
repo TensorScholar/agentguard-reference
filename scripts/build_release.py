@@ -1,26 +1,103 @@
 import hashlib
 import re
 import sys
+import tomllib
 import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-TOP_LEVEL = (".gitignore", "README.md", "CHANGELOG.md", "SECURITY.md", "LICENSE",
-             "Makefile", "pyproject.toml")
-DIRECTORIES = {"src": {".py"}, "tests": {".py"}, "examples": {".py", ".md"},
-               "docs": {".md"}, "scripts": {".py"}}
-FORBIDDEN = (
-    b"-----BEGIN PRIVATE KEY-----", b"-----BEGIN RSA PRIVATE KEY-----",
-    b"-----BEGIN OPENSSH PRIVATE KEY-----", b"-----BEGIN EC PRIVATE KEY-----",
-    b"-----BEGIN DSA PRIVATE KEY-----", b"/Users/", b"/home/", b"C:\\Users\\",
-    b"../agentguard/", b"AGENTGUARD_CORE",
-    # Canonical package remote. Split so this public file does not contain it verbatim.
-    b"github.com/TensorScholar/" b"agentguard.git",
-)
+# Files the published artifact must contain. Their absence is a defect.
+REQUIRED_TOP_LEVEL = ("LICENSE", "README.md", "CHANGELOG.md", "SECURITY.md",
+                      "Makefile", "pyproject.toml")
+# Files included when present. A source distribution and an unpacked archive have no
+# version-control metadata, so these must never be required.
+OPTIONAL_TOP_LEVEL = (".gitignore", "MANIFEST.in")
+# `scripts` is intentionally absent from DIRECTORIES: this module is the collector,
+# so archiving it would ship the collector's own policy.
+DIRECTORIES = {"src": {".py", ".typed"}, "tests": {".py"}, "examples": {".py", ".md"},
+               "docs": {".md"}}
+
+PEM_PATTERN = re.compile(rb"-----BEGIN [A-Z ]*PRIVATE KEY-----")
+HOME_PATTERN = re.compile(rb"(?:^|[\s\"'(])(?:/Users/|/home/|/root/)")
+CREDENTIAL_PATTERN = re.compile(
+    rb"(?:AKIA|ASIA)[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{30,}|xox[baprs]-|"
+    rb"glpat-[A-Za-z0-9_-]{20,}")
+REMOTE_PATTERN = re.compile(rb"\b[\w.-]+\.git\b")
+TRAVERSAL_PATTERN = re.compile(rb"\.\./")
+MARKDOWN_SUFFIXES = (".md", ".rst", ".txt")
+
+
+def family_stem(root: Path = ROOT) -> bytes:
+    """The package-family stem, derived from this package's own declared name.
+
+    Deriving the stem is what lets the leakage rules below be written without ever
+    spelling a private identifier. A marker that must be kept out of every tracked
+    and shipped file cannot also be the marker written into a tracked or shipped
+    file, so the rule is expressed against the stem this package declares for
+    itself instead of against a forbidden string.
+    """
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    return project["project"]["name"].split("-")[0].encode("ascii")
+
+
+def approved_names(stem: bytes) -> tuple[bytes, ...]:
+    """Public names of this artifact that may legitimately carry the family stem.
+
+    Matched case-insensitively, so prose capitalisation is approved too.
+    """
+    return (stem + b"-reference", stem + b"_reference", b"." + stem,
+            stem + b" Reference", stem + b" Core")
+
+
+def family_violations(data: bytes, stem: bytes | None = None) -> list[bytes]:
+    """Return every family-stem reference that is not a public name of this package.
+
+    Approved public names are removed first, so the residue is exactly the set of
+    references that claim something other than this artifact -- a version-control
+    remote, a sibling checkout path, or a marker token. A bare family stem used as a
+    package name is not a public name of this artifact and is reported.
+    """
+    stem = stem if stem is not None else family_stem()
+    residue = data
+    for name in approved_names(stem):
+        residue = re.sub(re.escape(name), b"", residue, flags=re.IGNORECASE)
+    return re.findall(re.escape(stem) + rb"\S*", residue, flags=re.IGNORECASE)
+
+
+def public_artifact_violations(relative: str, data: bytes) -> list[str]:
+    """Reasons why ``relative`` must not enter a public artifact. Fails closed.
+
+    Every rule is expressed with a generic shape or with a name this package
+    declares for itself. No private identifier appears in this module.
+    """
+    reasons: list[str] = []
+    if PEM_PATTERN.search(data):
+        reasons.append("private-key PEM header")
+    if HOME_PATTERN.search(data):
+        reasons.append("user home directory path")
+    if CREDENTIAL_PATTERN.search(data):
+        reasons.append("credential-shaped token")
+    if REMOTE_PATTERN.search(data):
+        reasons.append("version-control remote")
+    if not relative.endswith(MARKDOWN_SUFFIXES) and TRAVERSAL_PATTERN.search(data):
+        reasons.append("parent-directory traversal outside the package")
+    for reference in family_violations(data):
+        reasons.append(f"non-public package-family reference {reference!r}")
+    return reasons
 
 
 def collect(root: Path) -> dict[str, bytes]:
-    candidates = [root / name for name in TOP_LEVEL]
+    """Collect the publishable file set and apply the public-artifact policy.
+
+    Membership is decided by an explicit allow-list of paths and file types. Content
+    policy is applied to every candidate, including this module's own siblings, with
+    no exemption: a scanner that exempts itself is not a scanner.
+    """
+    missing = [name for name in REQUIRED_TOP_LEVEL if not (root / name).is_file()]
+    if missing:
+        raise ValueError(f"required source missing: {', '.join(missing)}")
+    candidates = [root / name for name in REQUIRED_TOP_LEVEL + OPTIONAL_TOP_LEVEL
+                  if (root / name).is_file()]
     for name, suffixes in DIRECTORIES.items():
         directory = root / name
         if directory.is_symlink():
@@ -36,18 +113,15 @@ def collect(root: Path) -> dict[str, bytes]:
                 if path.suffix not in suffixes:
                     raise ValueError(f"unapproved file type: {relative}")
                 candidates.append(path)
-    files = {}
+    files: dict[str, bytes] = {}
     for path in sorted(candidates):
         if path.is_symlink() or not path.is_file():
             raise ValueError(f"missing or symlink source: {path.name}")
         relative = path.relative_to(root).as_posix()
         data = path.read_bytes()
-        if relative != "scripts/build_release.py":
-            if any(marker in data for marker in FORBIDDEN):
-                raise ValueError(f"publication marker detected: {relative}")
-            if re.search(rb"(?:AKIA|ASIA)[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{30,}|xox[baprs]-",
-                         data):
-                raise ValueError(f"credential-like token detected: {relative}")
+        reasons = public_artifact_violations(relative, data)
+        if reasons:
+            raise ValueError(f"not publishable: {relative}: {'; '.join(reasons)}")
         files[relative] = data
     return files
 
